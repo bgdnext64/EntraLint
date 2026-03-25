@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_sp_004",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review admin-consented delegated permissions with broad scope",
+    "ServiceName": "ServicePrincipals",
+    "Severity": "HIGH",
+    "ResourceType": "OAuth2PermissionGrant",
+    "Description": "Identifies OAuth2 delegated permission grants (oauth2PermissionGrants) where admin consent has been given for all users (consentType=AllPrincipals) with scopes that include high-risk permissions like Mail.ReadWrite, Files.ReadWrite.All, or Directory.ReadWrite.All.",
+    "Risk": "Admin-consented delegated permissions apply to all users in the tenant. If a third-party app has Mail.ReadWrite consented for all users, access to every user mailbox via that app, with attacker needing only a valid user token. This is the delegated equivalent of over-privileged application permissions.",
+    "Remediation": {
+        "Recommendation": "Review all admin-consented delegated permissions. Revoke grants that are no longer needed. Prefer user-consented grants scoped to individual users where possible. Use application access policies for mail scoping.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-consent-requests"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.5.2"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-6"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/oauth2PermissionGrants"],
+    "RequiredPermissions": ["DelegatedPermissionGrant.ReadWrite.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated. Excessive delegated permission review is a well-known Entra ID security best practice."
+}

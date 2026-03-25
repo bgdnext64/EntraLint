@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from entralint.core.models import (
     Application,
+    AppRoleAssignment,
     ConditionalAccessPolicy,
     DirectoryRoleAssignment,
     Organization,
@@ -39,6 +40,9 @@ class TenantContext(BaseModel):
 
     # Role Assignments
     role_assignments: list[DirectoryRoleAssignment] = Field(default_factory=list)
+
+    # App role assignments (granted application permissions on SPs)
+    app_role_assignments: list[AppRoleAssignment] = Field(default_factory=list)
 
     # Delegated permission grants (raw dicts for now)
     oauth2_permission_grants: list[dict[str, Any]] = Field(default_factory=list)

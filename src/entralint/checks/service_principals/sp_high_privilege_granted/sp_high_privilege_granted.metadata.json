@@ -1,0 +1,24 @@
+{
+    "CheckID": "entraid_sp_003",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review service principals with high-privilege granted application permissions",
+    "ServiceName": "ServicePrincipals",
+    "Severity": "CRITICAL",
+    "ResourceType": "ServicePrincipal",
+    "Description": "Identifies service principals that have been granted high-privilege application permissions (app roles) on Microsoft Graph, such as RoleManagement.ReadWrite.Directory, Application.ReadWrite.All, or Mail.ReadWrite. Unlike declared permissions on app registrations, these are actually consented and active.",
+    "Risk": "Granted application permissions are live, consented access. A service principal with Application.ReadWrite.All can create new app registrations and grant itself more permissions. Mail.ReadWrite grants full mailbox access across all users. These represent the actual blast radius of a compromised workload identity.",
+    "Remediation": {
+        "Recommendation": "Audit each high-privilege app role assignment. Remove unnecessary permissions. Use application access policies to scope mailbox access. Prefer delegated permissions with user context where possible.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity-platform/app-only-access-primer"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.3.5"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.2"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-6"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/servicePrincipals/{id}/appRoleAssignments"],
+    "RequiredPermissions": ["Application.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated. High-privilege role GUIDs are well-known Microsoft Graph identifiers."
+}

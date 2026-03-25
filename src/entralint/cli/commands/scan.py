@@ -17,6 +17,7 @@ from entralint.core.context import TenantContext
 from entralint.core.engine import CheckEngine
 from entralint.core.models import (
     Application,
+    AppRoleAssignment,
     ConditionalAccessPolicy,
     DirectoryRoleAssignment,
     ServicePrincipal,
@@ -155,7 +156,46 @@ async def _fetch_and_scan(
         except Exception as exc:
             if not quiet:
                 console.print(f"[red]✗[/red] ({exc})")
+        # --- Fetch OAuth2 Permission Grants (delegated permissions) ---
+        oauth2_grants: list[dict] = []
+        if not quiet:
+            console.print("  Fetching delegated permission grants...", end=" ")
+        try:
+            oauth2_grants = await graph.get_all_pages(
+                "/oauth2PermissionGrants"
+            )
+            if not quiet:
+                console.print(
+                    f"[green]\u2713[/green] ({len(oauth2_grants)} grants)"
+                )
+        except Exception as exc:
+            if not quiet:
+                console.print(f"[red]\u2717[/red] ({exc})")
 
+        # --- Fetch App Role Assignments (application permissions on SPs) ---
+        all_app_role_assignments: list[AppRoleAssignment] = []
+        if not quiet:
+            console.print("  Fetching app role assignments...", end=" ")
+        try:
+            for sp in service_principals:
+                try:
+                    raw_sp_ara = await graph.get(
+                        f"/servicePrincipals/{sp.id}/appRoleAssignments"
+                    )
+                    for item in raw_sp_ara.get("value", []):
+                        all_app_role_assignments.append(
+                            AppRoleAssignment.model_validate(item)
+                        )
+                except Exception:
+                    continue
+            if not quiet:
+                console.print(
+                    f"[green]\u2713[/green] "
+                    f"({len(all_app_role_assignments)} assignments)"
+                )
+        except Exception as exc:
+            if not quiet:
+                console.print(f"[red]\u2717[/red] ({exc})")
         # --- Build TenantContext ---
         context = TenantContext(
             conditional_access_policies=policies,
@@ -163,6 +203,8 @@ async def _fetch_and_scan(
             users=users,
             service_principals=service_principals,
             role_assignments=role_assignments,
+            app_role_assignments=all_app_role_assignments,
+            oauth2_permission_grants=oauth2_grants,
             security_defaults_policy=security_defaults,
             authorization_policy=authorization_policy,
             granted_permissions=granted_permissions,

@@ -100,6 +100,40 @@ class KeyCredential(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class ResourceAccess(BaseModel):
+    """A single permission entry within requiredResourceAccess."""
+
+    id: str = ""
+    type: str = ""  # "Role" (application) or "Scope" (delegated)
+
+    model_config = {"populate_by_name": True}
+
+
+class RequiredResourceAccess(BaseModel):
+    """Permissions an app declares it needs from a resource API."""
+
+    resource_app_id: str = Field(default="", alias="resourceAppId")
+    resource_access: list[ResourceAccess] = Field(
+        default_factory=list, alias="resourceAccess"
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class AppRoleAssignment(BaseModel):
+    """A granted application permission on a service principal."""
+
+    id: str = ""
+    app_role_id: str = Field(default="", alias="appRoleId")
+    principal_display_name: str = Field(default="", alias="principalDisplayName")
+    principal_id: str = Field(default="", alias="principalId")
+    principal_type: str = Field(default="", alias="principalType")
+    resource_display_name: str = Field(default="", alias="resourceDisplayName")
+    resource_id: str = Field(default="", alias="resourceId")
+
+    model_config = {"populate_by_name": True}
+
+
 class Application(BaseModel):
     id: str = ""
     display_name: str = Field(default="", alias="displayName")
@@ -112,6 +146,9 @@ class Application(BaseModel):
         default_factory=list, alias="keyCredentials"
     )
     owners: list[dict[str, str]] = Field(default_factory=list)
+    required_resource_access: list[RequiredResourceAccess] = Field(
+        default_factory=list, alias="requiredResourceAccess"
+    )
 
     model_config = {"populate_by_name": True}
 

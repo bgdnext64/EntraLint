@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_app_005",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review app registrations requesting high-privilege Graph API permissions",
+    "ServiceName": "Applications",
+    "Severity": "HIGH",
+    "ResourceType": "Application",
+    "Description": "Identifies app registrations that declare high-privilege Microsoft Graph application permissions (Role type) in their requiredResourceAccess, such as RoleManagement.ReadWrite.All, Application.ReadWrite.All, or Mail.ReadWrite.",
+    "Risk": "Apps requesting high-privilege application permissions can act tenant-wide without user context if those permissions are consented. Even if not yet granted, the declared intent signals over-scoping and violates least privilege.",
+    "Remediation": {
+        "Recommendation": "Review the requested permissions for each flagged app. Remove unnecessary high-privilege permissions and replace with narrower scopes. Use application access policies to restrict mailbox access where possible.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity-platform/permissions-consent-overview"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.3.5"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-6"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/applications"],
+    "RequiredPermissions": ["Application.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated. High-privilege permission IDs are well-known Microsoft Graph role GUIDs."
+}
