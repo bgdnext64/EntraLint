@@ -169,6 +169,9 @@ class CheckEngine:
             # Execute the check
             try:
                 findings = check.execute(context)
+                for finding in findings:
+                    if not finding.frameworks:
+                        finding.frameworks = check.metadata.frameworks
                 all_findings.extend(findings)
 
                 # Track failures for dependency resolution
