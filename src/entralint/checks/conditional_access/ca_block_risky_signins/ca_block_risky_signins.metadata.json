@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_ca_005",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure sign-in risk policy is configured to block high and medium risk",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "HIGH",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Verifies that at least one enabled Conditional Access policy responds to sign-in risk levels (high and/or medium) by requiring MFA or blocking access. Requires Entra ID P2 or Entra ID Governance.",
+    "Risk": "Without sign-in risk policies, Entra ID cannot automatically respond to suspicious sign-in patterns such as impossible travel, anonymous IP addresses, or credential spray attacks detected by Identity Protection.",
+    "Remediation": {
+        "Recommendation": "Create a Conditional Access policy targeting All Users with sign-in risk levels set to High and Medium, requiring MFA or blocking access.",
+        "Url": "https://learn.microsoft.com/en-us/entra/id-protection/howto-identity-protection-configure-risk-policies"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.2.7"]},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.3.4"]},
+        {"framework": "NIST_800-53", "controls": ["SI-4"]}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": "p2",
+    "DependsOn": []
+}

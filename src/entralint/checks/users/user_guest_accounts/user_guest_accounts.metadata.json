@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_user_001",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review guest user accounts in the tenant",
+    "ServiceName": "Users",
+    "Severity": "MEDIUM",
+    "ResourceType": "User",
+    "Description": "Identifies guest (external) user accounts in the tenant. Guest users have limited but real access to directory data and may be granted access to applications and resources. Stale or unreviewed guest accounts expand the attack surface.",
+    "Risk": "Guest users from external organizations can enumerate directory objects, access shared applications, and may have been granted permissions to sensitive resources. Unreviewed guest accounts from former partners or contractors represent persistent external access.",
+    "Remediation": {
+        "Recommendation": "Regularly review guest user accounts. Remove guests no longer needed. Use Entra ID access reviews to automate guest lifecycle management. Restrict guest permissions via external collaboration settings.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/users/clean-up-stale-guest-accounts"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.2.1"]},
+        {"framework": "NIST_800-53", "controls": ["AC-2"]}
+    ],
+    "GraphAPIEndpoints": ["/users"],
+    "RequiredPermissions": ["User.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": []
+}

@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_org_001",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure Security Defaults are disabled when Conditional Access is in use",
+    "ServiceName": "Organization",
+    "Severity": "HIGH",
+    "ResourceType": "Policy",
+    "Description": "Checks the status of Security Defaults. Security Defaults provide baseline protections but are mutually exclusive with Conditional Access policies. Tenants using CA should have Security Defaults disabled. Tenants without CA should have Security Defaults enabled.",
+    "Risk": "If Security Defaults are enabled alongside Conditional Access policies, the behavior can be unpredictable. If neither Security Defaults nor CA policies are configured, the tenant has no MFA enforcement at all.",
+    "Remediation": {
+        "Recommendation": "If using Conditional Access policies, disable Security Defaults. If not using CA, enable Security Defaults for baseline MFA protection.",
+        "Url": "https://learn.microsoft.com/en-us/entra/fundamentals/security-defaults"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.1.1"]},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.1.1"]},
+        {"framework": "NIST_800-53", "controls": ["IA-2"]}
+    ],
+    "GraphAPIEndpoints": ["/policies/identitySecurityDefaultsEnforcementPolicy"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": []
+}

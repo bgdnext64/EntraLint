@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_app_003",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review multi-tenant app registrations",
+    "ServiceName": "Applications",
+    "Severity": "MEDIUM",
+    "ResourceType": "Application",
+    "Description": "Identifies app registrations configured for multi-tenant access (signInAudience set to AzureADMultipleOrgs or AzureADandPersonalMicrosoftAccount). These apps accept tokens from any Entra ID tenant.",
+    "Risk": "Multi-tenant apps accept authentication from any Azure AD tenant. If the app does not properly validate the tenant ID, users from external organizations could access internal resources. Apps configured for personal Microsoft accounts expand the attack surface further.",
+    "Remediation": {
+        "Recommendation": "Review each multi-tenant app to verify it is intentionally configured for external access. Switch to single-tenant (AzureADMyOrg) for apps that only serve internal users. Implement tenant validation in the app code for legitimate multi-tenant scenarios.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity-platform/single-and-multi-tenant-apps"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.3.3"]},
+        {"framework": "NIST_800-53", "controls": ["AC-3"]}
+    ],
+    "GraphAPIEndpoints": ["/applications"],
+    "RequiredPermissions": ["Application.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": []
+}
