@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_ca_007",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure persistent browser sessions are restricted on unmanaged devices",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "MEDIUM",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Verifies that at least one enabled Conditional Access policy disables persistent browser sessions or enforces sign-in frequency, preventing indefinite session persistence on unmanaged or shared devices.",
+    "Risk": "Persistent browser sessions keep users signed in indefinitely. On shared or unmanaged devices, this allows subsequent users to access organizational resources without re-authenticating.",
+    "Remediation": {
+        "Recommendation": "Create a Conditional Access policy with session controls that disables persistent browser sessions (set persistentBrowser mode to 'never') or enforces a sign-in frequency for unmanaged device scenarios.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-session-lifetime"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.3.1"]},
+        {"framework": "NIST_800-53", "controls": ["AC-12"]}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": []
+}

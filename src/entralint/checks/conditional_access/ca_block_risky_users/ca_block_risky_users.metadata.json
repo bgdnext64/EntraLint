@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_ca_006",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure user risk policy is configured to block high-risk users",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "HIGH",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Verifies that at least one enabled Conditional Access policy responds to user risk levels (high) by requiring password change or blocking access. Requires Entra ID P2.",
+    "Risk": "Without user risk policies, accounts flagged as compromised by Identity Protection (leaked credentials, suspicious activity patterns) continue to operate normally, giving attackers persistent access.",
+    "Remediation": {
+        "Recommendation": "Create a Conditional Access policy targeting All Users with user risk level set to High, requiring secure password change or blocking access.",
+        "Url": "https://learn.microsoft.com/en-us/entra/id-protection/howto-identity-protection-configure-risk-policies"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.2.8"]},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.3.5"]},
+        {"framework": "NIST_800-53", "controls": ["SI-4"]}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": "p2",
+    "DependsOn": []
+}

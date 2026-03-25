@@ -35,6 +35,12 @@ class ConditionalAccessConditions(BaseModel):
         default_factory=ConditionalAccessConditionApps
     )
     client_app_types: list[str] = Field(default_factory=list, alias="clientAppTypes")
+    sign_in_risk_levels: list[str] = Field(
+        default_factory=list, alias="signInRiskLevels"
+    )
+    user_risk_levels: list[str] = Field(
+        default_factory=list, alias="userRiskLevels"
+    )
 
     model_config = {"populate_by_name": True}
 
@@ -49,6 +55,17 @@ class ConditionalAccessGrantControls(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class ConditionalAccessSessionControls(BaseModel):
+    persistent_browser: dict[str, str] | None = Field(
+        default=None, alias="persistentBrowser"
+    )
+    sign_in_frequency: dict[str, str | int] | None = Field(
+        default=None, alias="signInFrequency"
+    )
+
+    model_config = {"populate_by_name": True}
+
+
 class ConditionalAccessPolicy(BaseModel):
     id: str = ""
     display_name: str = Field(default="", alias="displayName")
@@ -58,6 +75,9 @@ class ConditionalAccessPolicy(BaseModel):
     )
     grant_controls: ConditionalAccessGrantControls | None = Field(
         default=None, alias="grantControls"
+    )
+    session_controls: ConditionalAccessSessionControls | None = Field(
+        default=None, alias="sessionControls"
     )
 
     model_config = {"populate_by_name": True}

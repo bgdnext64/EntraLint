@@ -15,7 +15,7 @@ from entralint.cli.output import display_scan_summary
 from entralint.core.check import Finding, Status
 from entralint.core.context import TenantContext
 from entralint.core.engine import CheckEngine
-from entralint.core.models import Application, ConditionalAccessPolicy
+from entralint.core.models import Application, ConditionalAccessPolicy, User
 from entralint.graph.client import GraphClient
 
 console = Console()
@@ -67,10 +67,43 @@ async def _fetch_and_scan(
             if not quiet:
                 console.print(f"[red]✗[/red] ({exc})")
 
+        # --- Fetch Users ---
+        if not quiet:
+            console.print("  Fetching users...", end=" ")
+        try:
+            raw_users = await graph.get_all_pages("/users")
+            users = [User.model_validate(u) for u in raw_users]
+            granted_permissions.add("User.Read.All")
+            if not quiet:
+                console.print(f"[green]✓[/green] ({len(users)} users)")
+        except Exception as exc:
+            users = []
+            if not quiet:
+                console.print(f"[red]✗[/red] ({exc})")
+
+        # --- Fetch Security Defaults policy ---
+        security_defaults: dict = {}
+        if not quiet:
+            console.print(
+                "  Fetching security defaults policy...", end=" "
+            )
+        try:
+            security_defaults = await graph.get(
+                "/policies/identitySecurityDefaultsEnforcementPolicy"
+            )
+            if not quiet:
+                status = "enabled" if security_defaults.get("isEnabled") else "disabled"
+                console.print(f"[green]✓[/green] ({status})")
+        except Exception as exc:
+            if not quiet:
+                console.print(f"[red]✗[/red] ({exc})")
+
         # --- Build TenantContext ---
         context = TenantContext(
             conditional_access_policies=policies,
             applications=apps,
+            users=users,
+            security_defaults_policy=security_defaults,
             granted_permissions=granted_permissions,
         )
 

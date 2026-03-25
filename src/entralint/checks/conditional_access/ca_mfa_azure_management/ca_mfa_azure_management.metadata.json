@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_ca_004",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure MFA is required for Azure Management",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "CRITICAL",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Verifies that at least one enabled Conditional Access policy enforces MFA when accessing the Azure Management portal and APIs (Microsoft Azure Management app ID: 797f4846-ba00-4fd7-ba43-dac1f8f63013).",
+    "Risk": "The Azure portal and ARM APIs control all Azure resources. Without MFA for Azure Management, a compromised credential grants full control over cloud infrastructure, billing, and data.",
+    "Remediation": {
+        "Recommendation": "Create a Conditional Access policy targeting All Users with the Microsoft Azure Management app (797f4846-ba00-4fd7-ba43-dac1f8f63013) and MFA grant control.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-policy-azure-management"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.2.4"]},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.3.3"]},
+        {"framework": "NIST_800-53", "controls": ["IA-2(1)"]}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": []
+}
