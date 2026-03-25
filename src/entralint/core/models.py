@@ -10,6 +10,8 @@ class ConditionalAccessConditionUsers(BaseModel):
     exclude_users: list[str] = Field(default_factory=list, alias="excludeUsers")
     include_groups: list[str] = Field(default_factory=list, alias="includeGroups")
     exclude_groups: list[str] = Field(default_factory=list, alias="excludeGroups")
+    include_roles: list[str] = Field(default_factory=list, alias="includeRoles")
+    exclude_roles: list[str] = Field(default_factory=list, alias="excludeRoles")
 
     model_config = {"populate_by_name": True}
 
@@ -69,6 +71,15 @@ class PasswordCredential(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class KeyCredential(BaseModel):
+    key_id: str = Field(default="", alias="keyId")
+    display_name: str | None = Field(default=None, alias="displayName")
+    end_date_time: str | None = Field(default=None, alias="endDateTime")
+    credential_type: str = Field(default="", alias="type")
+
+    model_config = {"populate_by_name": True}
+
+
 class Application(BaseModel):
     id: str = ""
     display_name: str = Field(default="", alias="displayName")
@@ -76,6 +87,9 @@ class Application(BaseModel):
     sign_in_audience: str = Field(default="", alias="signInAudience")
     password_credentials: list[PasswordCredential] = Field(
         default_factory=list, alias="passwordCredentials"
+    )
+    key_credentials: list[KeyCredential] = Field(
+        default_factory=list, alias="keyCredentials"
     )
 
     model_config = {"populate_by_name": True}
