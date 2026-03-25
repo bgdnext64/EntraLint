@@ -54,3 +54,5 @@ entralint-report-*.json
 entralint-report-*.csv
 entralint-report-*.sarif
 entralint-report-*.pdf
+
+scan-report.json

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -145,7 +147,7 @@ class Application(BaseModel):
     key_credentials: list[KeyCredential] = Field(
         default_factory=list, alias="keyCredentials"
     )
-    owners: list[dict[str, str]] = Field(default_factory=list)
+    owners: list[dict[str, Any]] = Field(default_factory=list)
     required_resource_access: list[RequiredResourceAccess] = Field(
         default_factory=list, alias="requiredResourceAccess"
     )
@@ -185,8 +187,8 @@ class DirectoryRoleAssignment(BaseModel):
     principal_id: str = Field(default="", alias="principalId")
     role_definition_id: str = Field(default="", alias="roleDefinitionId")
     directory_scope_id: str = Field(default="/", alias="directoryScopeId")
-    principal: dict[str, str] | None = None
-    role_definition: dict[str, str] | None = Field(
+    principal: dict[str, Any] | None = None
+    role_definition: dict[str, Any] | None = Field(
         default=None, alias="roleDefinition"
     )
 
@@ -196,7 +198,7 @@ class DirectoryRoleAssignment(BaseModel):
 class Organization(BaseModel):
     id: str = ""
     display_name: str = Field(default="", alias="displayName")
-    verified_domains: list[dict[str, str]] = Field(
+    verified_domains: list[dict[str, Any]] = Field(
         default_factory=list, alias="verifiedDomains"
     )
 
