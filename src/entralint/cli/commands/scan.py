@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import Annotated
 
 import typer
@@ -24,6 +23,8 @@ from entralint.core.models import (
     User,
 )
 from entralint.graph.client import GraphClient
+from entralint.reports.json_report import format_json
+from entralint.reports.sarif_report import format_sarif
 
 console = Console()
 
@@ -348,12 +349,26 @@ def scan(
         display_scan_summary(findings)
 
     # --- Output ---
-    if output == "json" and output_file:
-        report_data = [f.model_dump(mode="json") for f in findings]
-        with open(output_file, "w", encoding="utf-8") as fh:
-            json.dump(report_data, fh, indent=2)
-        if not quiet:
-            console.print(f"\n[dim]Report written to {output_file}[/dim]")
+    report_text: str | None = None
+    if output == "json":
+        report_text = format_json(findings)
+    elif output == "sarif":
+        # Build metadata lookup so SARIF rules get full descriptions
+        meta_lookup = {
+            c.metadata.check_id: c.metadata.model_dump(mode="json")
+            for c in engine.discover()
+        }
+        report_text = format_sarif(findings, check_metadata=meta_lookup)
+
+    if report_text is not None:
+        if output_file:
+            with open(output_file, "w", encoding="utf-8") as fh:
+                fh.write(report_text)
+            if not quiet:
+                console.print(f"\n[dim]{output.upper()} report written to {output_file}[/dim]")
+        elif quiet:
+            # In quiet mode with no file, print to stdout for piping
+            print(report_text)
 
     # --- Exit code ---
     has_failures = any(f.status == Status.FAIL for f in findings)
