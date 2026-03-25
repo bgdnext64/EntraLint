@@ -66,7 +66,7 @@ async def _fetch_and_scan(
             console.print("  Fetching applications...", end=" ")
         try:
             raw_apps = await graph.get_all_pages(
-                "/applications?$expand=owners($select=id)"
+                "/applications?$expand=owners($select=id,displayName)"
             )
             apps = [Application.model_validate(a) for a in raw_apps]
             granted_permissions.add("Application.Read.All")
@@ -130,7 +130,7 @@ async def _fetch_and_scan(
         try:
             raw_assignments = await graph.get_all_pages(
                 "/roleManagement/directory/roleAssignments"
-                "?$expand=roleDefinition($select=displayName),principal($select=id,displayName)"
+                "?$expand=principal($select=id,displayName)"
             )
             role_assignments = [
                 DirectoryRoleAssignment.model_validate(a) for a in raw_assignments
