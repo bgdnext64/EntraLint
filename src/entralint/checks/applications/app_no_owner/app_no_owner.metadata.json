@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_app_004",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure app registrations have an assigned owner",
+    "ServiceName": "Applications",
+    "Severity": "MEDIUM",
+    "ResourceType": "Application",
+    "Description": "Identifies app registrations that have no owner assigned. Ownerless apps cannot be managed through self-service and credential rotation responsibility is unclear.",
+    "Risk": "Without an assigned owner, there is no accountable party for credential rotation, permission reviews, or incident response. Ownerless apps often become orphaned with stale credentials and excessive permissions.",
+    "Remediation": {
+        "Recommendation": "Assign at least one owner to each app registration. Use Entra ID access reviews to periodically verify app ownership. Remove or disable truly orphaned applications.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/assign-app-owners"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.3.4"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["CM-8"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/applications?$expand=owners($select=id)"],
+    "RequiredPermissions": ["Application.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated based on training data knowledge of CIS and NIST frameworks. Verify against CIS Microsoft 365 Foundations Benchmark v5.0+ before citing in compliance reports."
+}

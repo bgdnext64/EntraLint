@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_sp_001",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure disabled service principals do not have active credentials",
+    "ServiceName": "ServicePrincipals",
+    "Severity": "HIGH",
+    "ResourceType": "ServicePrincipal",
+    "Description": "Identifies service principals that are disabled (accountEnabled=false) but still have active password credentials or certificate credentials. These credentials could be re-enabled or exploited if the service principal is accidentally re-enabled.",
+    "Risk": "Disabled service principals with active credentials represent latent access paths. If re-enabled accidentally or by an attacker with sufficient privileges, the existing credentials provide immediate access without requiring credential provisioning.",
+    "Remediation": {
+        "Recommendation": "Remove all credentials (secrets and certificates) from disabled service principals. If the service principal is no longer needed, delete it entirely.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/disable-user-sign-in-portal"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.3.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-2(3)"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/servicePrincipals"],
+    "RequiredPermissions": ["Application.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated. Check logic based on Microsoft Entra security best practices for service principal hygiene."
+}

@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_user_002",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review disabled user accounts still present in the tenant",
+    "ServiceName": "Users",
+    "Severity": "LOW",
+    "ResourceType": "User",
+    "Description": "Identifies user accounts that are disabled (accountEnabled=false) but not yet deleted. Disabled accounts that linger may indicate incomplete offboarding or accumulate stale permissions.",
+    "Risk": "Disabled accounts left in the directory retain group memberships, role assignments, and app consent grants. If an admin re-enables the account, all previous access is instantly restored. They also inflate licensing counts and create noise in access reviews.",
+    "Remediation": {
+        "Recommendation": "Review disabled accounts periodically. Delete accounts for users who have permanently departed. Use Entra ID lifecycle workflows to automate offboarding and account cleanup.",
+        "Url": "https://learn.microsoft.com/en-us/entra/id-governance/lifecycle-workflow-tasks"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.3.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-2(3)"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/users"],
+    "RequiredPermissions": ["User.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated. This is an informational check — disabled accounts are not inherently a vulnerability but require periodic review."
+}

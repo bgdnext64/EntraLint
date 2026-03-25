@@ -111,6 +111,7 @@ class Application(BaseModel):
     key_credentials: list[KeyCredential] = Field(
         default_factory=list, alias="keyCredentials"
     )
+    owners: list[dict[str, str]] = Field(default_factory=list)
 
     model_config = {"populate_by_name": True}
 
@@ -121,6 +122,12 @@ class ServicePrincipal(BaseModel):
     app_id: str = Field(default="", alias="appId")
     service_principal_type: str = Field(default="", alias="servicePrincipalType")
     account_enabled: bool = Field(default=True, alias="accountEnabled")
+    password_credentials: list[PasswordCredential] = Field(
+        default_factory=list, alias="passwordCredentials"
+    )
+    key_credentials: list[KeyCredential] = Field(
+        default_factory=list, alias="keyCredentials"
+    )
 
     model_config = {"populate_by_name": True}
 
@@ -141,6 +148,10 @@ class DirectoryRoleAssignment(BaseModel):
     principal_id: str = Field(default="", alias="principalId")
     role_definition_id: str = Field(default="", alias="roleDefinitionId")
     directory_scope_id: str = Field(default="/", alias="directoryScopeId")
+    principal: dict[str, str] | None = None
+    role_definition: dict[str, str] | None = Field(
+        default=None, alias="roleDefinition"
+    )
 
     model_config = {"populate_by_name": True}
 

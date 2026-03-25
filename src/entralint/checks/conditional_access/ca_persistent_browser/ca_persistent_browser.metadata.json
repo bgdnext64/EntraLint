@@ -12,11 +12,12 @@
         "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-session-lifetime"
     },
     "Frameworks": [
-        {"framework": "CIS_M365_v5", "controls": ["5.2.3.1"]},
-        {"framework": "NIST_800-53", "controls": ["AC-12"]}
+        {"framework": "CIS_M365_v5", "controls": ["5.2.3.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-12"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
     ],
     "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
     "RequiredPermissions": ["Policy.Read.All"],
     "RequiredLicense": null,
-    "DependsOn": []
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated based on training data knowledge of CIS and NIST frameworks. No CISA SCuBA mapping identified. Verify against CIS Microsoft 365 Foundations Benchmark v5.0+ before citing in compliance reports."
 }

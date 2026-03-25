@@ -15,7 +15,13 @@ from entralint.cli.output import display_scan_summary
 from entralint.core.check import Finding, Status
 from entralint.core.context import TenantContext
 from entralint.core.engine import CheckEngine
-from entralint.core.models import Application, ConditionalAccessPolicy, User
+from entralint.core.models import (
+    Application,
+    ConditionalAccessPolicy,
+    DirectoryRoleAssignment,
+    ServicePrincipal,
+    User,
+)
 from entralint.graph.client import GraphClient
 
 console = Console()
@@ -57,7 +63,9 @@ async def _fetch_and_scan(
         if not quiet:
             console.print("  Fetching applications...", end=" ")
         try:
-            raw_apps = await graph.get_all_pages("/applications")
+            raw_apps = await graph.get_all_pages(
+                "/applications?$expand=owners($select=id)"
+            )
             apps = [Application.model_validate(a) for a in raw_apps]
             granted_permissions.add("Application.Read.All")
             if not quiet:
@@ -98,12 +106,65 @@ async def _fetch_and_scan(
             if not quiet:
                 console.print(f"[red]✗[/red] ({exc})")
 
+        # --- Fetch Service Principals ---
+        if not quiet:
+            console.print("  Fetching service principals...", end=" ")
+        try:
+            raw_sps = await graph.get_all_pages("/servicePrincipals")
+            service_principals = [ServicePrincipal.model_validate(sp) for sp in raw_sps]
+            granted_permissions.add("Application.Read.All")
+            if not quiet:
+                console.print(
+                    f"[green]✓[/green] ({len(service_principals)} service principals)"
+                )
+        except Exception as exc:
+            service_principals = []
+            if not quiet:
+                console.print(f"[red]✗[/red] ({exc})")
+
+        # --- Fetch Directory Role Assignments ---
+        if not quiet:
+            console.print("  Fetching role assignments...", end=" ")
+        try:
+            raw_assignments = await graph.get_all_pages(
+                "/roleManagement/directory/roleAssignments"
+                "?$expand=roleDefinition($select=displayName),principal($select=id,displayName)"
+            )
+            role_assignments = [
+                DirectoryRoleAssignment.model_validate(a) for a in raw_assignments
+            ]
+            granted_permissions.add("RoleManagement.Read.Directory")
+            if not quiet:
+                console.print(f"[green]✓[/green] ({len(role_assignments)} assignments)")
+        except Exception as exc:
+            role_assignments = []
+            if not quiet:
+                console.print(f"[red]✗[/red] ({exc})")
+
+        # --- Fetch Authorization Policy ---
+        authorization_policy: dict = {}
+        if not quiet:
+            console.print("  Fetching authorization policy...", end=" ")
+        try:
+            authorization_policy = await graph.get(
+                "/policies/authorizationPolicy"
+            )
+            granted_permissions.add("Policy.Read.All")
+            if not quiet:
+                console.print("[green]✓[/green]")
+        except Exception as exc:
+            if not quiet:
+                console.print(f"[red]✗[/red] ({exc})")
+
         # --- Build TenantContext ---
         context = TenantContext(
             conditional_access_policies=policies,
             applications=apps,
             users=users,
+            service_principals=service_principals,
+            role_assignments=role_assignments,
             security_defaults_policy=security_defaults,
+            authorization_policy=authorization_policy,
             granted_permissions=granted_permissions,
         )
 

@@ -12,11 +12,12 @@
         "Url": "https://learn.microsoft.com/en-us/entra/identity/users/clean-up-stale-guest-accounts"
     },
     "Frameworks": [
-        {"framework": "CIS_M365_v5", "controls": ["5.1.2.1"]},
-        {"framework": "NIST_800-53", "controls": ["AC-2"]}
+        {"framework": "CIS_M365_v5", "controls": ["5.1.2.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-2"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
     ],
     "GraphAPIEndpoints": ["/users"],
     "RequiredPermissions": ["User.Read.All"],
     "RequiredLicense": null,
-    "DependsOn": []
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated based on training data knowledge of CIS and NIST frameworks. No CISA SCuBA mapping identified. Verify against CIS Microsoft 365 Foundations Benchmark v5.0+ before citing in compliance reports."
 }

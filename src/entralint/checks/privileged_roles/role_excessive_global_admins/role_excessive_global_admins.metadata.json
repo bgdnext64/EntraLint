@@ -1,0 +1,24 @@
+{
+    "CheckID": "entraid_role_001",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure fewer than 5 users have the Global Administrator role",
+    "ServiceName": "PrivilegedRoles",
+    "Severity": "CRITICAL",
+    "ResourceType": "DirectoryRole",
+    "Description": "Checks that the number of permanent Global Administrator role assignments does not exceed the recommended maximum. Microsoft and CIS recommend no more than 4 Global Administrators.",
+    "Risk": "Every Global Administrator has unrestricted access to all tenant settings and data. Excessive Global Admins expand the attack surface and violate least-privilege principles. A compromised Global Admin account grants total tenant control.",
+    "Remediation": {
+        "Recommendation": "Reduce the number of permanent Global Administrator assignments to 4 or fewer. Use Privileged Identity Management (PIM) for just-in-time activation. Assign more specific admin roles (Exchange Admin, SharePoint Admin, etc.) where possible.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.1.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.7.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-6(5)"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/roleManagement/directory/roleAssignments"],
+    "RequiredPermissions": ["RoleManagement.Read.Directory"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated. Microsoft recommends no more than 4 Global Admins. CIS and CISA both include this as a critical control."
+}
