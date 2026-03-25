@@ -45,6 +45,7 @@ def _load_metadata() -> CheckMetadata:
         required_permissions=raw["RequiredPermissions"],
         required_license=raw.get("RequiredLicense"),
         depends_on=raw.get("DependsOn", []),
+        source_notes=raw.get("SourceNotes", ""),
     )
 
 

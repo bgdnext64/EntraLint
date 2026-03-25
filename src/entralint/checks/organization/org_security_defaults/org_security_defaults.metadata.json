@@ -12,12 +12,13 @@
         "Url": "https://learn.microsoft.com/en-us/entra/fundamentals/security-defaults"
     },
     "Frameworks": [
-        {"framework": "CIS_M365_v5", "controls": ["5.2.1.1"]},
-        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.1.1"]},
-        {"framework": "NIST_800-53", "controls": ["IA-2"]}
+        {"framework": "CIS_M365_v5", "controls": ["5.2.1.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.1.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["IA-2"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
     ],
     "GraphAPIEndpoints": ["/policies/identitySecurityDefaultsEnforcementPolicy"],
     "RequiredPermissions": ["Policy.Read.All"],
     "RequiredLicense": null,
-    "DependsOn": []
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated based on training data knowledge of CIS, CISA SCuBA, and NIST frameworks. Verify against CIS Microsoft 365 Foundations Benchmark v5.0+ and CISA BOD 25-01 Entra ID baseline before citing in compliance reports."
 }

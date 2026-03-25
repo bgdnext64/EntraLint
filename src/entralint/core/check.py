@@ -38,6 +38,8 @@ class FrameworkMapping(BaseModel):
 
     framework: str
     controls: list[str]
+    verified: bool = False
+    source: str = ""
 
 
 class CheckMetadata(BaseModel):
@@ -55,6 +57,7 @@ class CheckMetadata(BaseModel):
     required_permissions: list[str] = Field(default_factory=list)
     required_license: str | None = None
     depends_on: list[str] = Field(default_factory=list)
+    source_notes: str = ""
 
 
 class Finding(BaseModel):

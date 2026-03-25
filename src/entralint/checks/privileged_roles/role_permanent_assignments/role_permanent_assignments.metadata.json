@@ -1,0 +1,24 @@
+{
+    "CheckID": "entraid_role_002",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review permanent privileged role assignments",
+    "ServiceName": "PrivilegedRoles",
+    "Severity": "HIGH",
+    "ResourceType": "DirectoryRole",
+    "Description": "Identifies permanent (always-active) assignments to privileged directory roles. Best practice is to use Privileged Identity Management (PIM) for just-in-time role activation instead of standing assignments.",
+    "Risk": "Permanent role assignments provide continuous privileged access without time-boxing or approval workflows. If an account with a permanent privileged role is compromised, the attacker has immediate access without needing to activate PIM.",
+    "Remediation": {
+        "Recommendation": "Convert permanent role assignments to PIM-eligible assignments that require just-in-time activation. At minimum, configure PIM for Global Administrator, Privileged Role Administrator, and Exchange Administrator roles.",
+        "Url": "https://learn.microsoft.com/en-us/entra/id-governance/privileged-identity-management/pim-configure"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.1.2"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.7.2"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-6(1)"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/roleManagement/directory/roleAssignments"],
+    "RequiredPermissions": ["RoleManagement.Read.Directory"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated. This check identifies ALL permanent assignments to high-privilege roles. PIM-eligible assignments use a different Graph endpoint (/roleManagement/directory/roleEligibilityScheduleInstances)."
+}

@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_org_003",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure guest invitation settings are not overly permissive",
+    "ServiceName": "Organization",
+    "Severity": "MEDIUM",
+    "ResourceType": "Policy",
+    "Description": "Checks the authorization policy to ensure that guest invitations are restricted. When any user can invite guests, external accounts can proliferate without oversight.",
+    "Risk": "Unrestricted guest invitations allow any member to bring external users into the tenant. External users gain access to directory data and may be granted permissions to SharePoint sites, Teams, and applications without centralized review.",
+    "Remediation": {
+        "Recommendation": "Restrict guest invitations to admins only or users in the Guest Inviter role. Configure the allowInvitesFrom property in the authorization policy to 'adminsAndGuestInviters' or 'none'.",
+        "Url": "https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.2.2"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-2(7)"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/policies/authorizationPolicy"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated. Guest invitation restriction is a well-known Entra ID hardening control."
+}

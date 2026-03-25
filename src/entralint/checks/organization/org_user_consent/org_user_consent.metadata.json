@@ -1,0 +1,24 @@
+{
+    "CheckID": "entraid_org_002",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure user consent to applications is restricted",
+    "ServiceName": "Organization",
+    "Severity": "HIGH",
+    "ResourceType": "Policy",
+    "Description": "Checks the authorization policy to ensure that users cannot consent to third-party applications on their own. Unrestricted user consent allows illicit consent grant attacks.",
+    "Risk": "When users can consent to any app, an attacker can create a malicious app and trick users into granting it access to their mailbox, files, and profile. This is the 'illicit consent grant' attack — it requires no credential compromise.",
+    "Remediation": {
+        "Recommendation": "Set the default user role permission to not allow user consent to applications. Use the admin consent workflow so users can request consent that admins review and approve.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-user-consent"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.5.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["CM-7"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/policies/authorizationPolicy"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated. The illicit consent grant attack is well-documented by Microsoft and CISA."
+}
