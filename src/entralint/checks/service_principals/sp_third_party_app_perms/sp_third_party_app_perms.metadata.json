@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_sp_005",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review third-party service principals with application permissions",
+    "ServiceName": "ServicePrincipals",
+    "Severity": "MEDIUM",
+    "ResourceType": "ServicePrincipal",
+    "Description": "Identifies non-first-party, non-managed-identity service principals that have been granted application-level permissions via appRoleAssignments. Third-party apps with app permissions operate without user context and should be regularly reviewed.",
+    "Risk": "Third-party service principals with application permissions can access tenant data without user interaction. If a third-party vendor is compromised, granted application permissions provide a direct path to exfiltrate data or escalate privilege within the tenant.",
+    "Remediation": {
+        "Recommendation": "Review all third-party service principals with application permissions. Remove grants for apps that are no longer in use. Apply least-privilege by replacing broad permissions with narrower scopes. Consider using application access policies to restrict mailbox or site access.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-application-permissions"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.2"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-6", "SA-9"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/servicePrincipals/{id}/appRoleAssignments"],
+    "RequiredPermissions": ["Application.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Framework control IDs were AI-generated. Third-party app permission review is a well-known Entra ID security practice."
+}
