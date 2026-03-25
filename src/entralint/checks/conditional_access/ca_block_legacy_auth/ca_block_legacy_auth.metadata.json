@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_ca_002",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure legacy authentication is blocked via Conditional Access",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "CRITICAL",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Verifies that at least one enabled CA policy blocks legacy authentication protocols (Exchange ActiveSync, IMAP, POP3) which bypass MFA entirely.",
+    "Risk": "Legacy auth protocols do not support modern authentication or MFA. Attackers use password spray attacks against these endpoints to bypass MFA enforcement.",
+    "Remediation": {
+        "Recommendation": "Create a Conditional Access policy that blocks access for 'Exchange ActiveSync clients' and 'Other clients' client app types for all users.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-policy-block-legacy"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.2.3"]},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.5.1"]},
+        {"framework": "NIST_800-53", "controls": ["IA-2"]}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": []
+}
