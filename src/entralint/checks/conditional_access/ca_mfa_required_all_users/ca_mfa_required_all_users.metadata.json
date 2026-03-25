@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_ca_001",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure MFA is required for all users via Conditional Access",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "CRITICAL",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Verifies that at least one enabled Conditional Access policy enforces MFA for all users across all cloud apps.",
+    "Risk": "Without universal MFA enforcement, compromised credentials allow direct account takeover. This was the exact attack vector in the Midnight Blizzard breach.",
+    "Remediation": {
+        "Recommendation": "Create a Conditional Access policy targeting All Users with All Cloud Apps scope and MFA grant control.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-policy-all-users-mfa"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.2.2"]},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.3.1"]},
+        {"framework": "NIST_800-53", "controls": ["IA-2"]}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": []
+}
