@@ -15,7 +15,7 @@ from entralint.cli.output import display_scan_summary
 from entralint.core.check import Finding, Status
 from entralint.core.context import TenantContext
 from entralint.core.engine import CheckEngine
-from entralint.core.models import ConditionalAccessPolicy
+from entralint.core.models import Application, ConditionalAccessPolicy
 from entralint.graph.client import GraphClient
 
 console = Console()
@@ -53,9 +53,24 @@ async def _fetch_and_scan(
             if not quiet:
                 console.print(f"[red]✗[/red] ({exc})")
 
+        # --- Fetch Applications ---
+        if not quiet:
+            console.print("  Fetching applications...", end=" ")
+        try:
+            raw_apps = await graph.get_all_pages("/applications")
+            apps = [Application.model_validate(a) for a in raw_apps]
+            granted_permissions.add("Application.Read.All")
+            if not quiet:
+                console.print(f"[green]✓[/green] ({len(apps)} apps)")
+        except Exception as exc:
+            apps = []
+            if not quiet:
+                console.print(f"[red]✗[/red] ({exc})")
+
         # --- Build TenantContext ---
         context = TenantContext(
             conditional_access_policies=policies,
+            applications=apps,
             granted_permissions=granted_permissions,
         )
 

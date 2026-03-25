@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_ca_003",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure MFA is required for administrative roles via Conditional Access",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "CRITICAL",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Verifies that at least one enabled Conditional Access policy enforces MFA for users in privileged directory roles (Global Administrator, Exchange Administrator, SharePoint Administrator, etc.).",
+    "Risk": "Admin accounts are high-value targets. Without a dedicated MFA policy scoped to directory roles, compromised admin credentials grant full tenant control. Even if a global MFA policy exists, it may have exclusions that admins fall through.",
+    "Remediation": {
+        "Recommendation": "Create a Conditional Access policy targeting directory roles (e.g. Global Admin, Privileged Role Admin, Exchange Admin) with All Cloud Apps scope and MFA or authentication strength grant control.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-policy-admin-mfa"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.2.1"]},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.3.2"]},
+        {"framework": "NIST_800-53", "controls": ["IA-2(1)"]}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": []
+}
