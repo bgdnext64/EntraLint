@@ -49,10 +49,19 @@ def list_checks(
     ] = None,
 ) -> None:
     """List available security checks."""
+    from pathlib import Path
+
     from entralint.cli.output import display_check_list
+    from entralint.core.config import load_config_auto
     from entralint.core.engine import CheckEngine
 
-    engine = CheckEngine()
+    cfg = load_config_auto()
+    custom_dirs = (
+        [Path(d) for d in cfg.custom_checks_dirs]
+        if cfg and cfg.custom_checks_dirs
+        else None
+    )
+    engine = CheckEngine(custom_checks_dirs=custom_dirs)
     checks = engine.discover()
 
     severity_list = [s.strip() for s in severity.split(",")] if severity else None
@@ -71,14 +80,21 @@ def list_frameworks() -> None:
     console.print("  - NIST 800-53")
 
 
-@app.command(name="show-check")
-def show_check(
-    check_id: Annotated[str, typer.Argument(help="The check ID to display")],
-) -> None:
-    """Show details for a specific check."""
+def _explain_check(check_id: str) -> None:
+    """Look up a check by ID and display its full metadata."""
+    from pathlib import Path
+
+    from entralint.cli.output import display_check_detail
+    from entralint.core.config import load_config_auto
     from entralint.core.engine import CheckEngine
 
-    engine = CheckEngine()
+    cfg = load_config_auto()
+    custom_dirs = (
+        [Path(d) for d in cfg.custom_checks_dirs]
+        if cfg and cfg.custom_checks_dirs
+        else None
+    )
+    engine = CheckEngine(custom_checks_dirs=custom_dirs)
     checks = engine.discover()
     matched = [c for c in checks if c.metadata.check_id == check_id]
 
@@ -86,13 +102,20 @@ def show_check(
         console.print(f"[red]Check not found:[/red] {check_id}")
         raise typer.Exit(code=1)
 
-    meta = matched[0].metadata
-    console.print(f"[bold]{meta.check_id}[/bold] (v{meta.check_version})")
-    console.print(f"  Title:    {meta.check_title}")
-    console.print(f"  Severity: {meta.severity.value}")
-    console.print(f"  Category: {meta.service_name}")
-    console.print(f"  Risk:     {meta.risk}")
-    if meta.remediation.recommendation:
-        console.print(f"  Fix:      {meta.remediation.recommendation}")
-    if meta.remediation.url:
-        console.print(f"  Docs:     {meta.remediation.url}")
+    display_check_detail(matched[0].metadata)
+
+
+@app.command(name="show-check")
+def show_check(
+    check_id: Annotated[str, typer.Argument(help="The check ID to display")],
+) -> None:
+    """Show full details for a specific check."""
+    _explain_check(check_id)
+
+
+@app.command()
+def explain(
+    check_id: Annotated[str, typer.Argument(help="The check ID to explain")],
+) -> None:
+    """Print full metadata, risk, remediation, and framework mappings for a check."""
+    _explain_check(check_id)

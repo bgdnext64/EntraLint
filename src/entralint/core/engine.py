@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import pkgutil
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -13,22 +15,56 @@ if TYPE_CHECKING:
     from entralint.core.context import TenantContext
 
 
+# Well-known directories for user-supplied custom checks.
+_USER_CUSTOM_DIR = Path.home() / ".entralint" / "custom_checks"
+_PROJECT_CUSTOM_DIR = Path.cwd() / ".entralint" / "checks"
+
+
 class CheckEngine:
     """Discovers, filters, orders, and executes security checks."""
 
-    def __init__(self, checks_dirs: list[Path] | None = None) -> None:
+    def __init__(
+        self,
+        checks_dirs: list[Path] | None = None,
+        *,
+        custom_checks_dirs: list[Path] | None = None,
+    ) -> None:
         self._checks_dirs = checks_dirs or [
             Path(__file__).parent.parent / "checks",
         ]
+        # Append default custom-check locations + any user-configured extras.
+        extra: list[Path] = []
+        for d in [_USER_CUSTOM_DIR, _PROJECT_CUSTOM_DIR]:
+            if d.is_dir():
+                extra.append(d)
+        if custom_checks_dirs:
+            for d in custom_checks_dirs:
+                if d.is_dir() and d not in extra:
+                    extra.append(d)
+        self._custom_dirs = extra
         self._checks: list[BaseCheck] = []
 
     def discover(self) -> list[BaseCheck]:
-        """Auto-discover all check classes from the checks directories."""
+        """Auto-discover all check classes from built-in and custom directories."""
         discovered: list[BaseCheck] = []
+        seen_ids: set[str] = set()
+
+        # Built-in checks (entralint package).
         for checks_dir in self._checks_dirs:
             if not checks_dir.exists():
                 continue
-            discovered.extend(self._discover_in_dir(checks_dir))
+            for check in self._discover_in_dir(checks_dir):
+                if check.metadata.check_id not in seen_ids:
+                    seen_ids.add(check.metadata.check_id)
+                    discovered.append(check)
+
+        # Custom / external checks.
+        for custom_dir in self._custom_dirs:
+            for check in self._discover_external_dir(custom_dir):
+                if check.metadata.check_id not in seen_ids:
+                    seen_ids.add(check.metadata.check_id)
+                    discovered.append(check)
+
         self._checks = discovered
         return discovered
 
@@ -68,6 +104,49 @@ class CheckEngine:
                         except Exception:
                             continue
 
+        return found
+
+    @staticmethod
+    def _discover_external_dir(checks_dir: Path) -> list[BaseCheck]:
+        """Discover checks from a directory outside the entralint package.
+
+        Loads each ``.py`` file as an ad-hoc module using
+        ``importlib.util.spec_from_file_location`` so that custom checks
+        don't need to live in the ``entralint`` namespace.
+        """
+        found: list[BaseCheck] = []
+        if not checks_dir.is_dir():
+            return found
+
+        for py_file in sorted(checks_dir.rglob("*.py")):
+            if py_file.name.startswith("_"):
+                continue
+            module_name = f"entralint_custom.{py_file.stem}_{id(py_file)}"
+            spec = importlib.util.spec_from_file_location(module_name, py_file)
+            if spec is None or spec.loader is None:
+                continue
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = module
+            try:
+                spec.loader.exec_module(module)  # type: ignore[union-attr]
+            except Exception:
+                continue
+
+            for attr_name in dir(module):
+                attr = getattr(module, attr_name)
+                if (
+                    isinstance(attr, type)
+                    and issubclass(attr, BaseCheck)
+                    and attr is not BaseCheck
+                    and hasattr(attr, "metadata")
+                ):
+                    try:
+                        found.append(attr())
+                    except TypeError:
+                        try:
+                            found.append(attr(metadata=attr.metadata))
+                        except Exception:
+                            continue
         return found
 
     def _path_to_package(self, path: Path) -> str | None:

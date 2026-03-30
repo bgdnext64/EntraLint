@@ -13,6 +13,7 @@ from entralint.core.errors import (
     GraphAPIError,
     GraphThrottledError,
 )
+from entralint.graph.cache import GraphCache
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +22,37 @@ MAX_RETRIES = 3
 
 
 class GraphClient:
-    """Async Microsoft Graph API client with built-in resilience."""
+    """Async Microsoft Graph API client with built-in resilience.
 
-    def __init__(self, access_token: str) -> None:
+    Parameters
+    ----------
+    access_token:
+        A valid Microsoft Graph bearer token.
+    tenant_id:
+        Tenant identifier used as the cache partition key.
+        When ``None``, caching is disabled.
+    no_cache:
+        When ``True`` all reads bypass (and don't write to) the cache.
+    offline:
+        When ``True`` **only** cached data is used.  Any endpoint
+        missing from the cache raises ``GraphAPIError``.
+    """
+
+    def __init__(
+        self,
+        access_token: str,
+        *,
+        tenant_id: str | None = None,
+        no_cache: bool = False,
+        offline: bool = False,
+    ) -> None:
         self._token = access_token
+        self._tenant_id = tenant_id
+        self._no_cache = no_cache
+        self._offline = offline
+        self._cache: GraphCache | None = None
+        if tenant_id and not no_cache:
+            self._cache = GraphCache()
         self._client = httpx.AsyncClient(
             base_url=GRAPH_BASE_URL,
             timeout=30.0,
@@ -34,7 +62,21 @@ class GraphClient:
         return {"Authorization": f"Bearer {self._token}"}
 
     async def get(self, endpoint: str, params: dict[str, str] | None = None) -> Any:
-        """GET a Graph API endpoint with retry and error handling."""
+        """GET a Graph API endpoint with cache awareness, retry, and error handling."""
+        # --- Cache read ---
+        if self._cache and self._tenant_id:
+            cached = self._cache.get(self._tenant_id, endpoint)
+            if cached is not None:
+                logger.debug("Cache hit for %s", endpoint)
+                return cached
+
+        # In offline mode, a cache miss is fatal.
+        if self._offline:
+            raise GraphAPIError(
+                f"Offline mode: no cached data for {endpoint}. "
+                "Run a normal scan first to populate the cache.",
+            )
+
         last_exc: Exception | None = None
 
         for attempt in range(MAX_RETRIES):
@@ -50,7 +92,11 @@ class GraphClient:
                 continue
 
             if response.status_code == 200:
-                return response.json()
+                data = response.json()
+                # --- Cache write ---
+                if self._cache and self._tenant_id:
+                    self._cache.put(self._tenant_id, endpoint, data)
+                return data
 
             if response.status_code == 401:
                 raise AuthenticationExpiredError(
@@ -111,6 +157,8 @@ class GraphClient:
 
     async def close(self) -> None:
         await self._client.aclose()
+        if self._cache:
+            self._cache.close()
 
     async def __aenter__(self) -> GraphClient:
         return self

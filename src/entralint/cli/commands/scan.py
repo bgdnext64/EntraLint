@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -58,6 +59,10 @@ async def _fetch_and_scan(
     token: str,
     engine: CheckEngine,
     quiet: bool,
+    *,
+    tenant_id: str | None = None,
+    no_cache: bool = False,
+    offline: bool = False,
 ) -> list[Finding]:
     """Fetch Graph data and run checks."""
     granted_permissions: set[str] = set()
@@ -69,7 +74,12 @@ async def _fetch_and_scan(
     def _fail(label: str, detail: str = "") -> None:
         fetch_results.append((label, "[red]FAIL[/red]", detail))
 
-    async with GraphClient(access_token=token) as graph:
+    async with GraphClient(
+        access_token=token,
+        tenant_id=tenant_id,
+        no_cache=no_cache,
+        offline=offline,
+    ) as graph:
         with console.status(
             "[bold cyan]Collecting data from Microsoft Graph API...",
             spinner="dots",
@@ -420,7 +430,12 @@ def scan(
         console.print()
 
     # --- Setup engine with filters ---
-    engine = CheckEngine()
+    custom_dirs = (
+        [Path(d) for d in cfg.custom_checks_dirs]
+        if cfg and cfg.custom_checks_dirs
+        else None
+    )
+    engine = CheckEngine(custom_checks_dirs=custom_dirs)
     # Apply filters after discovery
     severity_list = [s.strip() for s in severity.split(",")] if severity else None
     check_ids = [c.strip() for c in checks.split(",")] if checks else None
@@ -437,6 +452,9 @@ def scan(
             token=token,
             engine=engine,
             quiet=suppress_console,
+            tenant_id=tenant,
+            no_cache=no_cache,
+            offline=offline,
         )
     )
 

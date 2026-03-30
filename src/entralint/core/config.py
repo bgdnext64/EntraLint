@@ -30,6 +30,7 @@ class EntraLintConfig(BaseModel):
     suppress: list[SuppressionRule] = Field(default_factory=list)
     overrides: dict[str, SeverityOverride] = Field(default_factory=dict)
     baseline: str | None = None
+    custom_checks_dirs: list[str] = Field(default_factory=list)
 
 
 # Default filenames to search for, in priority order.

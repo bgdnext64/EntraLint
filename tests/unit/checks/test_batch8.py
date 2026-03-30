@@ -2,6 +2,36 @@
 
 from datetime import UTC
 
+from entralint.checks.authentication.auth_certificate_not_enabled import (
+    auth_certificate_not_enabled as _auth_cert_mod,
+)
+from entralint.checks.authentication.auth_email_otp_enabled.auth_email_otp_enabled import (
+    AuthEmailOtpEnabled,
+)
+from entralint.checks.authentication.auth_fido2_not_enabled.auth_fido2_not_enabled import (
+    AuthFido2NotEnabled,
+)
+from entralint.checks.authentication.auth_tap_long_lifetime.auth_tap_long_lifetime import (
+    AuthTapLongLifetime,
+)
+from entralint.checks.privileged_roles.role_app_admin_excessive.role_app_admin_excessive import (
+    RoleAppAdminExcessive,
+)
+from entralint.checks.privileged_roles.role_cloud_app_admin_excessive import (
+    role_cloud_app_admin_excessive as _cloud_app_mod,
+)
+from entralint.checks.privileged_roles.role_multiple_high_priv.role_multiple_high_priv import (
+    RoleMultipleHighPriv,
+)
+from entralint.checks.privileged_roles.role_pra_excessive.role_pra_excessive import (
+    RolePraExcessive,
+)
+from entralint.checks.users.user_guest_risk_policy.user_guest_risk_policy import (
+    UserGuestRiskPolicy,
+)
+from entralint.checks.users.user_stale_guests.user_stale_guests import (
+    UserStaleGuests,
+)
 from entralint.core.check import Status
 from entralint.core.context import TenantContext
 from entralint.core.models import (
@@ -12,52 +42,31 @@ from entralint.core.models import (
     User,
 )
 
+AuthCertificateNotEnabled = _auth_cert_mod.AuthCertificateNotEnabled
+RoleCloudAppAdminExcessive = _cloud_app_mod.RoleCloudAppAdminExcessive
+
 # ── auth_007: FIDO2 not enabled ────────────────────────────
 
 
 def test_auth007_pass_fido2_enabled():
-    from entralint.checks.authentication.auth_fido2_not_enabled.auth_fido2_not_enabled import (
-        AuthFido2NotEnabled,
-    )
-
-    policy = {
-        "authenticationMethodConfigurations": [
-            {"id": "Fido2", "state": "enabled"}
-        ]
-    }
+    policy = {"authenticationMethodConfigurations": [{"id": "Fido2", "state": "enabled"}]}
     ctx = TenantContext(authentication_methods_policy=policy)
     assert AuthFido2NotEnabled().execute(ctx)[0].status == Status.PASS
 
 
 def test_auth007_fail_fido2_disabled():
-    from entralint.checks.authentication.auth_fido2_not_enabled.auth_fido2_not_enabled import (
-        AuthFido2NotEnabled,
-    )
-
-    policy = {
-        "authenticationMethodConfigurations": [
-            {"id": "Fido2", "state": "disabled"}
-        ]
-    }
+    policy = {"authenticationMethodConfigurations": [{"id": "Fido2", "state": "disabled"}]}
     ctx = TenantContext(authentication_methods_policy=policy)
     assert AuthFido2NotEnabled().execute(ctx)[0].status == Status.FAIL
 
 
 def test_auth007_fail_fido2_missing():
-    from entralint.checks.authentication.auth_fido2_not_enabled.auth_fido2_not_enabled import (
-        AuthFido2NotEnabled,
-    )
-
     policy = {"authenticationMethodConfigurations": []}
     ctx = TenantContext(authentication_methods_policy=policy)
     assert AuthFido2NotEnabled().execute(ctx)[0].status == Status.FAIL
 
 
 def test_auth007_skip_no_policy():
-    from entralint.checks.authentication.auth_fido2_not_enabled.auth_fido2_not_enabled import (
-        AuthFido2NotEnabled,
-    )
-
     ctx = TenantContext(authentication_methods_policy={})
     assert AuthFido2NotEnabled().execute(ctx)[0].status == Status.SKIPPED_PERMISSION
 
@@ -66,24 +75,14 @@ def test_auth007_skip_no_policy():
 
 
 def test_auth008_pass_tap_disabled():
-    from entralint.checks.authentication.auth_tap_long_lifetime.auth_tap_long_lifetime import (
-        AuthTapLongLifetime,
-    )
-
     policy = {
-        "authenticationMethodConfigurations": [
-            {"id": "TemporaryAccessPass", "state": "disabled"}
-        ]
+        "authenticationMethodConfigurations": [{"id": "TemporaryAccessPass", "state": "disabled"}]
     }
     ctx = TenantContext(authentication_methods_policy=policy)
     assert AuthTapLongLifetime().execute(ctx)[0].status == Status.PASS
 
 
 def test_auth008_pass_short_lifetime():
-    from entralint.checks.authentication.auth_tap_long_lifetime.auth_tap_long_lifetime import (
-        AuthTapLongLifetime,
-    )
-
     policy = {
         "authenticationMethodConfigurations": [
             {
@@ -98,10 +97,6 @@ def test_auth008_pass_short_lifetime():
 
 
 def test_auth008_fail_long_lifetime():
-    from entralint.checks.authentication.auth_tap_long_lifetime.auth_tap_long_lifetime import (
-        AuthTapLongLifetime,
-    )
-
     policy = {
         "authenticationMethodConfigurations": [
             {
@@ -118,10 +113,6 @@ def test_auth008_fail_long_lifetime():
 
 
 def test_auth008_pass_not_configured():
-    from entralint.checks.authentication.auth_tap_long_lifetime.auth_tap_long_lifetime import (
-        AuthTapLongLifetime,
-    )
-
     policy = {"authenticationMethodConfigurations": []}
     ctx = TenantContext(authentication_methods_policy=policy)
     assert AuthTapLongLifetime().execute(ctx)[0].status == Status.PASS
@@ -131,38 +122,18 @@ def test_auth008_pass_not_configured():
 
 
 def test_auth009_pass_disabled():
-    from entralint.checks.authentication.auth_email_otp_enabled.auth_email_otp_enabled import (
-        AuthEmailOtpEnabled,
-    )
-
-    policy = {
-        "authenticationMethodConfigurations": [
-            {"id": "Email", "state": "disabled"}
-        ]
-    }
+    policy = {"authenticationMethodConfigurations": [{"id": "Email", "state": "disabled"}]}
     ctx = TenantContext(authentication_methods_policy=policy)
     assert AuthEmailOtpEnabled().execute(ctx)[0].status == Status.PASS
 
 
 def test_auth009_fail_enabled():
-    from entralint.checks.authentication.auth_email_otp_enabled.auth_email_otp_enabled import (
-        AuthEmailOtpEnabled,
-    )
-
-    policy = {
-        "authenticationMethodConfigurations": [
-            {"id": "Email", "state": "enabled"}
-        ]
-    }
+    policy = {"authenticationMethodConfigurations": [{"id": "Email", "state": "enabled"}]}
     ctx = TenantContext(authentication_methods_policy=policy)
     assert AuthEmailOtpEnabled().execute(ctx)[0].status == Status.FAIL
 
 
 def test_auth009_pass_not_present():
-    from entralint.checks.authentication.auth_email_otp_enabled.auth_email_otp_enabled import (
-        AuthEmailOtpEnabled,
-    )
-
     policy = {"authenticationMethodConfigurations": []}
     ctx = TenantContext(authentication_methods_policy=policy)
     assert AuthEmailOtpEnabled().execute(ctx)[0].status == Status.PASS
@@ -172,38 +143,20 @@ def test_auth009_pass_not_present():
 
 
 def test_auth010_pass_enabled():
-    from entralint.checks.authentication.auth_certificate_not_enabled.auth_certificate_not_enabled import (
-        AuthCertificateNotEnabled,
-    )
-
-    policy = {
-        "authenticationMethodConfigurations": [
-            {"id": "X509Certificate", "state": "enabled"}
-        ]
-    }
+    policy = {"authenticationMethodConfigurations": [{"id": "X509Certificate", "state": "enabled"}]}
     ctx = TenantContext(authentication_methods_policy=policy)
     assert AuthCertificateNotEnabled().execute(ctx)[0].status == Status.PASS
 
 
 def test_auth010_fail_disabled():
-    from entralint.checks.authentication.auth_certificate_not_enabled.auth_certificate_not_enabled import (
-        AuthCertificateNotEnabled,
-    )
-
     policy = {
-        "authenticationMethodConfigurations": [
-            {"id": "X509Certificate", "state": "disabled"}
-        ]
+        "authenticationMethodConfigurations": [{"id": "X509Certificate", "state": "disabled"}]
     }
     ctx = TenantContext(authentication_methods_policy=policy)
     assert AuthCertificateNotEnabled().execute(ctx)[0].status == Status.FAIL
 
 
 def test_auth010_fail_missing():
-    from entralint.checks.authentication.auth_certificate_not_enabled.auth_certificate_not_enabled import (
-        AuthCertificateNotEnabled,
-    )
-
     policy = {"authenticationMethodConfigurations": []}
     ctx = TenantContext(authentication_methods_policy=policy)
     assert AuthCertificateNotEnabled().execute(ctx)[0].status == Status.FAIL
@@ -215,10 +168,6 @@ PRA_ROLE = "e8611ab8-c189-46e8-94e1-60213ab1f814"
 
 
 def test_role007_pass_two():
-    from entralint.checks.privileged_roles.role_pra_excessive.role_pra_excessive import (
-        RolePraExcessive,
-    )
-
     ras = [
         DirectoryRoleAssignment(id=f"r{i}", principal_id=f"u{i}", role_definition_id=PRA_ROLE)
         for i in range(2)
@@ -228,10 +177,6 @@ def test_role007_pass_two():
 
 
 def test_role007_fail_three():
-    from entralint.checks.privileged_roles.role_pra_excessive.role_pra_excessive import (
-        RolePraExcessive,
-    )
-
     ras = [
         DirectoryRoleAssignment(id=f"r{i}", principal_id=f"u{i}", role_definition_id=PRA_ROLE)
         for i in range(3)
@@ -243,13 +188,7 @@ def test_role007_fail_three():
 
 
 def test_role007_pass_only_other_roles():
-    from entralint.checks.privileged_roles.role_pra_excessive.role_pra_excessive import (
-        RolePraExcessive,
-    )
-
-    ras = [
-        DirectoryRoleAssignment(id="r1", principal_id="u1", role_definition_id="other-role-id")
-    ]
+    ras = [DirectoryRoleAssignment(id="r1", principal_id="u1", role_definition_id="other-role-id")]
     ctx = TenantContext(role_assignments=ras)
     assert RolePraExcessive().execute(ctx)[0].status == Status.PASS
 
@@ -261,29 +200,23 @@ SEC_ADMIN_ROLE = "194ae4cb-b126-40b2-bd5b-6091b380977d"
 
 
 def test_role008_pass_single_role():
-    from entralint.checks.privileged_roles.role_multiple_high_priv.role_multiple_high_priv import (
-        RoleMultipleHighPriv,
-    )
-
-    ras = [
-        DirectoryRoleAssignment(id="r1", principal_id="u1", role_definition_id=GA_ROLE)
-    ]
+    ras = [DirectoryRoleAssignment(id="r1", principal_id="u1", role_definition_id=GA_ROLE)]
     ctx = TenantContext(role_assignments=ras)
     assert RoleMultipleHighPriv().execute(ctx)[0].status == Status.PASS
 
 
 def test_role008_fail_two_high_priv():
-    from entralint.checks.privileged_roles.role_multiple_high_priv.role_multiple_high_priv import (
-        RoleMultipleHighPriv,
-    )
-
     ras = [
         DirectoryRoleAssignment(
-            id="r1", principal_id="u1", role_definition_id=GA_ROLE,
+            id="r1",
+            principal_id="u1",
+            role_definition_id=GA_ROLE,
             principal={"displayName": "Admin User"},
         ),
         DirectoryRoleAssignment(
-            id="r2", principal_id="u1", role_definition_id=SEC_ADMIN_ROLE,
+            id="r2",
+            principal_id="u1",
+            role_definition_id=SEC_ADMIN_ROLE,
             principal={"displayName": "Admin User"},
         ),
     ]
@@ -294,10 +227,6 @@ def test_role008_fail_two_high_priv():
 
 
 def test_role008_pass_different_users():
-    from entralint.checks.privileged_roles.role_multiple_high_priv.role_multiple_high_priv import (
-        RoleMultipleHighPriv,
-    )
-
     ras = [
         DirectoryRoleAssignment(id="r1", principal_id="u1", role_definition_id=GA_ROLE),
         DirectoryRoleAssignment(id="r2", principal_id="u2", role_definition_id=SEC_ADMIN_ROLE),
@@ -312,12 +241,12 @@ APP_ADMIN_ROLE = "9b895d92-2cd3-44c7-9d02-a6ac2d5ea5c3"
 
 
 def test_role009_pass_five():
-    from entralint.checks.privileged_roles.role_app_admin_excessive.role_app_admin_excessive import (
-        RoleAppAdminExcessive,
-    )
-
     ras = [
-        DirectoryRoleAssignment(id=f"r{i}", principal_id=f"u{i}", role_definition_id=APP_ADMIN_ROLE)
+        DirectoryRoleAssignment(
+            id=f"r{i}",
+            principal_id=f"u{i}",
+            role_definition_id=APP_ADMIN_ROLE,
+        )
         for i in range(5)
     ]
     ctx = TenantContext(role_assignments=ras)
@@ -325,12 +254,12 @@ def test_role009_pass_five():
 
 
 def test_role009_fail_six():
-    from entralint.checks.privileged_roles.role_app_admin_excessive.role_app_admin_excessive import (
-        RoleAppAdminExcessive,
-    )
-
     ras = [
-        DirectoryRoleAssignment(id=f"r{i}", principal_id=f"u{i}", role_definition_id=APP_ADMIN_ROLE)
+        DirectoryRoleAssignment(
+            id=f"r{i}",
+            principal_id=f"u{i}",
+            role_definition_id=APP_ADMIN_ROLE,
+        )
         for i in range(6)
     ]
     ctx = TenantContext(role_assignments=ras)
@@ -343,12 +272,12 @@ CLOUD_APP_ROLE = "158c047a-c907-4556-b7ef-446551a6b5f7"
 
 
 def test_role010_pass_five():
-    from entralint.checks.privileged_roles.role_cloud_app_admin_excessive.role_cloud_app_admin_excessive import (
-        RoleCloudAppAdminExcessive,
-    )
-
     ras = [
-        DirectoryRoleAssignment(id=f"r{i}", principal_id=f"u{i}", role_definition_id=CLOUD_APP_ROLE)
+        DirectoryRoleAssignment(
+            id=f"r{i}",
+            principal_id=f"u{i}",
+            role_definition_id=CLOUD_APP_ROLE,
+        )
         for i in range(5)
     ]
     ctx = TenantContext(role_assignments=ras)
@@ -356,12 +285,12 @@ def test_role010_pass_five():
 
 
 def test_role010_fail_six():
-    from entralint.checks.privileged_roles.role_cloud_app_admin_excessive.role_cloud_app_admin_excessive import (
-        RoleCloudAppAdminExcessive,
-    )
-
     ras = [
-        DirectoryRoleAssignment(id=f"r{i}", principal_id=f"u{i}", role_definition_id=CLOUD_APP_ROLE)
+        DirectoryRoleAssignment(
+            id=f"r{i}",
+            principal_id=f"u{i}",
+            role_definition_id=CLOUD_APP_ROLE,
+        )
         for i in range(6)
     ]
     ctx = TenantContext(role_assignments=ras)
@@ -385,15 +314,14 @@ def _risk_policy(
         user_risk_levels=user_risk or [],
     )
     return ConditionalAccessPolicy(
-        id="p1", display_name="Risk Policy", state=state, conditions=conds,
+        id="p1",
+        display_name="Risk Policy",
+        state=state,
+        conditions=conds,
     )
 
 
 def test_user007_pass_all_users():
-    from entralint.checks.users.user_guest_risk_policy.user_guest_risk_policy import (
-        UserGuestRiskPolicy,
-    )
-
     p = _risk_policy(
         users=ConditionalAccessConditionUsers(include_users=["All"]),
         sign_in_risk=["high"],
@@ -403,10 +331,6 @@ def test_user007_pass_all_users():
 
 
 def test_user007_pass_guests_targeted():
-    from entralint.checks.users.user_guest_risk_policy.user_guest_risk_policy import (
-        UserGuestRiskPolicy,
-    )
-
     p = _risk_policy(
         users=ConditionalAccessConditionUsers(include_users=["GuestsOrExternalUsers"]),
         user_risk=["medium"],
@@ -416,10 +340,6 @@ def test_user007_pass_guests_targeted():
 
 
 def test_user007_fail_no_guest_in_risk():
-    from entralint.checks.users.user_guest_risk_policy.user_guest_risk_policy import (
-        UserGuestRiskPolicy,
-    )
-
     p = _risk_policy(
         users=ConditionalAccessConditionUsers(include_users=["user1"]),
         sign_in_risk=["high"],
@@ -429,12 +349,10 @@ def test_user007_fail_no_guest_in_risk():
 
 
 def test_user007_fail_no_risk_policies():
-    from entralint.checks.users.user_guest_risk_policy.user_guest_risk_policy import (
-        UserGuestRiskPolicy,
-    )
-
     p = ConditionalAccessPolicy(
-        id="p1", display_name="MFA", state="enabled",
+        id="p1",
+        display_name="MFA",
+        state="enabled",
         conditions=ConditionalAccessConditions(
             users=ConditionalAccessConditionUsers(include_users=["All"]),
         ),
@@ -447,65 +365,57 @@ def test_user007_fail_no_risk_policies():
 
 
 def test_user008_pass_no_guests():
-    from entralint.checks.users.user_stale_guests.user_stale_guests import (
-        UserStaleGuests,
+    ctx = TenantContext(
+        users=[
+            User(id="u1", user_type="Member", display_name="Member User"),
+        ]
     )
-
-    ctx = TenantContext(users=[
-        User(id="u1", user_type="Member", display_name="Member User"),
-    ])
     assert UserStaleGuests().execute(ctx)[0].status == Status.PASS
 
 
 def test_user008_fail_stale_guest():
-    from entralint.checks.users.user_stale_guests.user_stale_guests import (
-        UserStaleGuests,
+    ctx = TenantContext(
+        users=[
+            User(
+                id="g1",
+                user_type="Guest",
+                display_name="Old Guest",
+                created_date_time="2023-01-01T00:00:00Z",
+                sign_in_activity={
+                    "lastSignInDateTime": "2023-06-01T00:00:00Z",
+                },
+            ),
+        ]
     )
-
-    ctx = TenantContext(users=[
-        User(
-            id="g1",
-            user_type="Guest",
-            display_name="Old Guest",
-            created_date_time="2023-01-01T00:00:00Z",
-            sign_in_activity={
-                "lastSignInDateTime": "2023-06-01T00:00:00Z",
-            },
-        ),
-    ])
     assert UserStaleGuests().execute(ctx)[0].status == Status.FAIL
 
 
 def test_user008_pass_recent_guest():
     from datetime import datetime
 
-    from entralint.checks.users.user_stale_guests.user_stale_guests import (
-        UserStaleGuests,
-    )
-
     recent = datetime.now(UTC).isoformat()
-    ctx = TenantContext(users=[
-        User(
-            id="g1",
-            user_type="Guest",
-            display_name="Active Guest",
-            sign_in_activity={"lastSignInDateTime": recent},
-        ),
-    ])
+    ctx = TenantContext(
+        users=[
+            User(
+                id="g1",
+                user_type="Guest",
+                display_name="Active Guest",
+                sign_in_activity={"lastSignInDateTime": recent},
+            ),
+        ]
+    )
     assert UserStaleGuests().execute(ctx)[0].status == Status.PASS
 
 
 def test_user008_fail_no_signin_old_creation():
-    from entralint.checks.users.user_stale_guests.user_stale_guests import (
-        UserStaleGuests,
+    ctx = TenantContext(
+        users=[
+            User(
+                id="g1",
+                user_type="Guest",
+                display_name="Never Signed In",
+                created_date_time="2022-01-01T00:00:00Z",
+            ),
+        ]
     )
-
-    ctx = TenantContext(users=[
-        User(
-            id="g1",
-            user_type="Guest",
-            display_name="Never Signed In",
-            created_date_time="2022-01-01T00:00:00Z",
-        ),
-    ])
     assert UserStaleGuests().execute(ctx)[0].status == Status.FAIL
