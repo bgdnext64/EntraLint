@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import sys
 from typing import Annotated
 
 import typer
 from rich.console import Console
+
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import entralint
 from entralint.cli.commands import cache, config, login, report, scan

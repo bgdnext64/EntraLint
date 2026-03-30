@@ -64,7 +64,7 @@ def display_scan_summary(findings: list[Finding]) -> None:
     unique_checks = len({f.check_id for f in findings})
 
     console.print()
-    console.rule("[bold]Summary[/bold]")
+    console.rule("[bold]Summary[/bold]", characters="=")
     console.print(
         f"  Checks: {unique_checks}    "
         f"Findings: {total}    "

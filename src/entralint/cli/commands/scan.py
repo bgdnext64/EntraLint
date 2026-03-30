@@ -387,6 +387,7 @@ def scan(
                 f"Tenant: {tenant}\nProfile: {profile or 'default'}",
                 title="[bold]EntraLint v0.1.0[/bold]",
                 border_style="cyan",
+                safe_box=True,
             )
         )
         console.print()
