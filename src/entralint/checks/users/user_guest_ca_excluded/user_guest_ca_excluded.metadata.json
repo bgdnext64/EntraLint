@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_user_005",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Detect guest or external users excluded from Conditional Access policies",
+    "ServiceName": "Users",
+    "Severity": "HIGH",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Identifies Conditional Access policies that explicitly exclude guest or external users from enforcement. Guest users excluded from security policies such as MFA or device compliance are left unprotected.",
+    "Risk": "Excluding guest users from CA policies creates a two-tier security model where external identities bypass protections that internal users are subject to. Attackers target the weakest link — unprotected guest accounts can be used for initial access.",
+    "Remediation": {
+        "Recommendation": "Review CA policies that exclude guest users and remove unnecessary exclusions. Create dedicated guest-specific CA policies if different controls are needed for external identities.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-users-groups#exclude-users"
+    },
+    "Frameworks": [
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.2"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "CIS_M365_v5", "controls": ["5.2.2.7"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "AI-generated framework mappings — verify before citing in compliance reports."
+}

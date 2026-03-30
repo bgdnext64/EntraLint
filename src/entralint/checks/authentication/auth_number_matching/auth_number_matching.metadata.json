@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_auth_004",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure Microsoft Authenticator number matching is enforced",
+    "ServiceName": "Authentication",
+    "Severity": "MEDIUM",
+    "ResourceType": "AuthenticationMethodsPolicy",
+    "Description": "Verifies that the Microsoft Authenticator push notification configuration requires number matching. Without number matching, MFA fatigue attacks can trick users into approving sign-ins they did not initiate.",
+    "Risk": "Without number matching, attackers can bombard users with repeated MFA push notifications (MFA fatigue/prompt bombing) until the user accidentally approves. Number matching forces the user to enter a displayed number, preventing blind approval.",
+    "Remediation": {
+        "Recommendation": "Enable number matching in the Microsoft Authenticator settings under Authentication Methods policy. This is the default for tenants since May 2023 but may have been overridden.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/authentication/how-to-mfa-number-match"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.3.4"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["IA-2(6)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/policies/authenticationMethodsPolicy"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Number matching became default for new tenants in May 2023. AI-generated framework mappings."
+}

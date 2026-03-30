@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_org_006",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review outbound cross-tenant access for unrestricted defaults",
+    "ServiceName": "Organization",
+    "Severity": "MEDIUM",
+    "ResourceType": "CrossTenantAccessPolicy",
+    "Description": "Checks whether the default outbound cross-tenant access policy allows unrestricted B2B collaboration and B2B direct connect to external organizations. Unrestricted outbound access allows users to share data with any external tenant.",
+    "Risk": "Unrestricted outbound cross-tenant access allows users to accept invitations and share resources with any external Azure AD/Entra ID tenant. This can lead to data exfiltration, shadow IT, and unauthorized collaboration with untrusted organizations.",
+    "Remediation": {
+        "Recommendation": "Review and restrict outbound cross-tenant access defaults. Configure specific partner organizations where outbound access is needed and block all others.",
+        "Url": "https://learn.microsoft.com/en-us/entra/external-id/cross-tenant-access-settings-b2b-collaboration"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.7.2"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-20"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/policies/crossTenantAccessPolicy/default"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "AI-generated framework mappings — verify before citing in compliance reports."
+}

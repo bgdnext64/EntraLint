@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_user_006",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Detect excessive number of guest users in tenant",
+    "ServiceName": "Users",
+    "Severity": "LOW",
+    "ResourceType": "User",
+    "Description": "Flags tenants with more than 50 guest users. A large number of guest accounts may indicate missing lifecycle management, over-invitation, or abandoned external collaboration. Each guest is a potential lateral-movement entry point.",
+    "Risk": "Guest accounts often have weaker security controls than member accounts. Large guest populations increase the attack surface and make it harder to audit external access. Abandoned or forgotten guest accounts may retain access to shared resources indefinitely.",
+    "Remediation": {
+        "Recommendation": "Implement guest access reviews using Entra ID Access Reviews. Remove inactive guest accounts and establish a guest lifecycle policy with automatic expiration.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/governance/manage-guest-access-with-access-reviews"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.8.2"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-2(3)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/users"],
+    "RequiredPermissions": ["User.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Threshold of 50 guests is a heuristic. AI-generated framework mappings."
+}

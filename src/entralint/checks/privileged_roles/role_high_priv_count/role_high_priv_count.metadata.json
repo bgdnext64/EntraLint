@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_role_006",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Detect non-GA privileged roles with excessive assignments",
+    "ServiceName": "PrivilegedRoles",
+    "Severity": "HIGH",
+    "ResourceType": "DirectoryRoleAssignment",
+    "Description": "Identifies high-privilege directory roles (other than Global Administrator) that have more than 5 permanent assignments. Excessive assignments to roles like Application Administrator, Privileged Role Administrator, or Security Administrator increase the blast radius of compromise.",
+    "Risk": "Over-assigning high-privilege roles creates excessive standing access. If any one of these accounts is compromised, the attacker gains significant control. The principle of least privilege requires minimizing the number of principals in any privileged role.",
+    "Remediation": {
+        "Recommendation": "Review role assignments and remove unnecessary permanent assignments. Use Privileged Identity Management (PIM) for just-in-time activation of privileged roles.",
+        "Url": "https://learn.microsoft.com/en-us/entra/id-governance/privileged-identity-management/pim-configure"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["1.1.3"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.7.3"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/roleManagement/directory/roleAssignments"],
+    "RequiredPermissions": ["RoleManagement.Read.Directory"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Threshold of 5 per role is a heuristic. AI-generated framework mappings."
+}

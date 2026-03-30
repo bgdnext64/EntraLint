@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_app_007",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Detect non-admin users owning applications with high-privilege permissions",
+    "ServiceName": "Applications",
+    "Severity": "CRITICAL",
+    "ResourceType": "Application",
+    "Description": "Identifies applications requesting high-privilege Graph API permissions where at least one owner is not a privileged administrator. Non-admin app owners can modify credentials on powerful apps, creating privilege escalation paths.",
+    "Risk": "This was the exact attack vector in the Midnight Blizzard breach: a non-admin user owned a test application that held dangerous permissions. The attacker compromised the non-admin user, added new credentials to the app, and escalated to full tenant compromise.",
+    "Remediation": {
+        "Recommendation": "Ensure applications with high-privilege API permissions are owned exclusively by privileged administrators. Remove non-admin owners or reduce the app's permissions to least-privilege.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/overview-assign-app-owners"
+    },
+    "Frameworks": [
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.6.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-6(5)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/applications?$expand=owners", "/roleManagement/directory/roleAssignments"],
+    "RequiredPermissions": ["Application.Read.All", "RoleManagement.Read.Directory"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Modeled on the Midnight Blizzard attack vector. AI-generated framework mappings."
+}

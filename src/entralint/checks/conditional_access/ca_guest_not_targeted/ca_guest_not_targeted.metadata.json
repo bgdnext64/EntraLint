@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_ca_013",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure at least one Conditional Access policy targets guest/external users",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "HIGH",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Verifies that at least one enabled Conditional Access policy explicitly targets guest or external users, ensuring they are subject to access controls such as MFA or device compliance.",
+    "Risk": "If no CA policy targets guest or external users, these identities may bypass all Conditional Access protections. Attackers frequently compromise guest accounts as a lateral-movement vector into partner tenants.",
+    "Remediation": {
+        "Recommendation": "Create a Conditional Access policy that targets 'GuestsOrExternalUsers' to enforce MFA, session controls, or block risky sign-ins for external identities.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-users-groups#guest-or-external-users"
+    },
+    "Frameworks": [
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "CIS_M365_v5", "controls": ["5.2.2.6"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "AI-generated framework mappings — verify before citing in compliance reports."
+}

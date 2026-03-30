@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_sp_007",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Detect service principals with overly broad delegated permission grants",
+    "ServiceName": "ServicePrincipals",
+    "Severity": "HIGH",
+    "ResourceType": "OAuth2PermissionGrant",
+    "Description": "Identifies service principals that have been granted delegated permissions with all-inclusive scope strings such as full_access_as_user or .All variants through admin consent for all principals.",
+    "Risk": "Overly broad delegated permission grants allow service principals to act on behalf of all users with extensive access. Combined with admin consent, this creates a powerful access token that attackers can abuse for lateral movement and data exfiltration.",
+    "Remediation": {
+        "Recommendation": "Review delegated permission grants and reduce scope to least-privilege. Replace overly broad grants (e.g., 'full_access_as_user') with specific scoped permissions. Limit admin consent to required scopes only.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-application-permissions"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.5.2"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-6(1)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/oauth2PermissionGrants", "/servicePrincipals"],
+    "RequiredPermissions": ["DelegatedPermissionGrant.ReadWrite.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "AI-generated framework mappings — verify before citing in compliance reports."
+}

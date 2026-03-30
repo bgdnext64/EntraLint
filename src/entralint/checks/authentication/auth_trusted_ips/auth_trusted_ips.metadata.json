@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_auth_006",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review named locations configured as trusted for MFA bypass",
+    "ServiceName": "Authentication",
+    "Severity": "MEDIUM",
+    "ResourceType": "NamedLocation",
+    "Description": "Identifies named locations marked as 'trusted' which can be used to bypass MFA requirements in Conditional Access policies. Each trusted location should be reviewed to ensure it represents a genuinely controlled network.",
+    "Risk": "Named locations marked as trusted can be used in CA policy conditions to skip MFA. If an attacker can route traffic through a trusted IP range (VPN compromise, BGP hijack), they bypass MFA entirely. Over-trusting locations expands the attack surface.",
+    "Remediation": {
+        "Recommendation": "Review all trusted named locations and remove the trusted flag from any that do not represent corporate-controlled networks. Prefer compliant device checks over trusted location-based MFA bypass.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/location-condition"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.2.8"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["IA-2(13)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/namedLocations"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "AI-generated framework mappings — verify before citing in compliance reports."
+}
