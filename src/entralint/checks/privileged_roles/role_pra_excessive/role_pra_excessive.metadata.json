@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_role_007",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure Privileged Role Administrator has no more than 2 assignments",
+    "ServiceName": "PrivilegedRoles",
+    "Severity": "HIGH",
+    "ResourceType": "DirectoryRole",
+    "Description": "Checks whether the Privileged Role Administrator role has more than 2 permanent assignments. PRA can assign any role including Global Admin, making it the most dangerous escalation path in Entra ID.",
+    "Risk": "Privileged Role Administrators can grant any directory role to any principal, including Global Administrator. Excessive PRA assignments multiply the risk of privilege escalation. Each PRA is a potential path to full tenant compromise.",
+    "Remediation": {
+        "Recommendation": "Reduce Privileged Role Administrator assignments to at most 2 principals. Use PIM for just-in-time activation where possible. Ensure PRA holders are break-glass accounts or tightly controlled identities.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["1.1.4"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-6(1)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/roleManagement/directory/roleAssignments"],
+    "RequiredPermissions": ["RoleManagement.Read.Directory"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "PRA is the most dangerous escalation role after Global Admin itself."
+}

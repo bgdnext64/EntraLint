@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_org_007",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review cross-tenant inbound trust for external MFA claims",
+    "ServiceName": "Organization",
+    "Severity": "MEDIUM",
+    "ResourceType": "CrossTenantAccessPolicy",
+    "Description": "Checks whether the default cross-tenant access policy trusts MFA claims from external tenants. Trusting external MFA means your tenant relies on the MFA strength of other organizations.",
+    "Risk": "When external MFA claims are trusted, your Conditional Access policies accept MFA performed in the external tenant. If the external tenant has weak MFA (e.g., SMS only), your security posture is effectively downgraded for B2B users from that tenant.",
+    "Remediation": {
+        "Recommendation": "Review whether trusting external MFA claims is appropriate for your security posture. Consider disabling MFA trust by default and enabling it only for specific trusted partner tenants with known strong MFA policies.",
+        "Url": "https://learn.microsoft.com/en-us/entra/external-id/cross-tenant-access-settings-b2b-collaboration#to-change-inbound-trust-settings-for-mfa-and-device-claims"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["IA-8(4)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/policies/crossTenantAccessPolicy/default"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Cross-tenant MFA trust can inadvertently weaken MFA enforcement."
+}

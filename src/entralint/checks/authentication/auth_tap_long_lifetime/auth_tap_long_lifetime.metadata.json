@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_auth_008",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure Temporary Access Pass maximum lifetime is not excessive",
+    "ServiceName": "Authentication",
+    "Severity": "MEDIUM",
+    "ResourceType": "AuthenticationMethodsPolicy",
+    "Description": "Checks whether Temporary Access Pass (TAP) is enabled with a maximum lifetime exceeding 8 hours (480 minutes). Long-lived TAPs increase the window of opportunity for misuse if intercepted.",
+    "Risk": "Temporary Access Passes with excessive lifetimes remain valid for long periods, increasing the risk of credential theft and replay attacks. A stolen TAP could be used to register new MFA methods and establish persistent access.",
+    "Remediation": {
+        "Recommendation": "Set the Temporary Access Pass maximum lifetime to 480 minutes (8 hours) or less. Prefer one-time use TAPs when possible. Review TAP usage logs regularly.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/authentication/howto-authentication-temporary-access-pass"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.3.4"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["IA-5(13)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/policies/authenticationMethodsPolicy"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "TAP lifetime should be minimized to reduce the attack window."
+}

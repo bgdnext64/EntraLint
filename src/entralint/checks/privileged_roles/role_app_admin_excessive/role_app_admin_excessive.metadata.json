@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_role_009",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure Application Administrator has no more than 5 assignments",
+    "ServiceName": "PrivilegedRoles",
+    "Severity": "MEDIUM",
+    "ResourceType": "DirectoryRole",
+    "Description": "Checks whether the Application Administrator role has more than 5 permanent assignments. Application Administrators can create and manage all aspects of app registrations and service principals, including credential management.",
+    "Risk": "Application Administrators can add credentials to any application and service principal in the tenant, which can be used to impersonate those applications. Excessive assignments expand the attack surface for privilege escalation via application credential abuse.",
+    "Remediation": {
+        "Recommendation": "Reduce Application Administrator assignments to 5 or fewer. Use Cloud Application Administrator (which cannot manage application proxy) where the full Application Administrator role is not needed. Use PIM for just-in-time activation.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/permissions-reference#application-administrator"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["AC-6(1)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/roleManagement/directory/roleAssignments"],
+    "RequiredPermissions": ["RoleManagement.Read.Directory"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Application Administrator is a high-privilege role that controls application credentials."
+}

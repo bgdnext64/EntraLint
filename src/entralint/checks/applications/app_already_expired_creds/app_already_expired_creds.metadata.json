@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_app_008",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Detect applications with already-expired credentials",
+    "ServiceName": "Applications",
+    "Severity": "MEDIUM",
+    "ResourceType": "Application",
+    "Description": "Checks for application registrations that have password or certificate credentials past their expiration date. Expired credentials indicate poor credential lifecycle management and may signal abandoned applications.",
+    "Risk": "Applications with expired credentials indicate lack of maintenance. These may be abandoned apps that still have granted permissions. Expired credentials also cause authentication failures that may lead to workarounds like overly broad permissions on replacement apps.",
+    "Remediation": {
+        "Recommendation": "Remove expired credentials from application registrations. If the application is still in use, rotate the credentials. If the application is no longer needed, delete the registration and associated service principal.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal#option-3-create-a-new-client-secret"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["IA-5(1)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/applications"],
+    "RequiredPermissions": ["Application.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Distinct from app_001 which checks credentials expiring soon. This check flags already-expired credentials."
+}

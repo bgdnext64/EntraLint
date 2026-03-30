@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_user_007",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure guest users are covered by risk-based Conditional Access policies",
+    "ServiceName": "Users",
+    "Severity": "MEDIUM",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Checks whether risk-based Conditional Access policies (sign-in risk or user risk) include guest users in their scope. Guest accounts are frequent targets for credential stuffing and should be protected by risk-based policies.",
+    "Risk": "Guest accounts are often overlooked in Conditional Access targeting. Without risk-based CA coverage, a compromised guest account will not trigger risk-based blocks or MFA challenges, allowing attackers to operate undetected.",
+    "Remediation": {
+        "Recommendation": "Ensure Conditional Access policies with sign-in risk or user risk conditions target 'All users' or explicitly include 'GuestsOrExternalUsers'. Do not exclude guest users from risk-based policies.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-policy-risk"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["AC-2(12)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": "p2",
+    "DependsOn": [],
+    "SourceNotes": "Risk-based policies require Entra ID P2. Guest coverage is a common gap."
+}

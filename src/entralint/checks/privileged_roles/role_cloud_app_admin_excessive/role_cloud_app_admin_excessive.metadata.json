@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_role_010",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure Cloud Application Administrator has no more than 5 assignments",
+    "ServiceName": "PrivilegedRoles",
+    "Severity": "MEDIUM",
+    "ResourceType": "DirectoryRole",
+    "Description": "Checks whether the Cloud Application Administrator role has more than 5 permanent assignments. Cloud App Admins can manage app registrations and service principal credentials except for application proxy.",
+    "Risk": "Cloud Application Administrators can add secrets and certificates to service principals and app registrations, enabling impersonation of those applications. Excessive assignments increase the number of accounts that can perform credential abuse attacks.",
+    "Remediation": {
+        "Recommendation": "Reduce Cloud Application Administrator assignments to 5 or fewer. Consider scoping permissions with Administrative Units where possible. Use PIM for just-in-time activation.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/permissions-reference#cloud-application-administrator"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["AC-6(1)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/roleManagement/directory/roleAssignments"],
+    "RequiredPermissions": ["RoleManagement.Read.Directory"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Cloud Application Administrator is a common escalation path via credential abuse."
+}

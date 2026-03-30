@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_org_009",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure non-admin users cannot register applications",
+    "ServiceName": "Organization",
+    "Severity": "MEDIUM",
+    "ResourceType": "Policy",
+    "Description": "Checks whether the default user role allows non-admin users to register applications. When any user can register apps, it increases the risk of rogue applications being created in the tenant.",
+    "Risk": "Users who can register applications can create app registrations that request permissions, potentially tricking other users into consenting. This is a common vector for consent-grant phishing attacks. Only authorized administrators should register applications.",
+    "Remediation": {
+        "Recommendation": "Set 'Users can register applications' to No in the Entra ID user settings. Use the Application Developer role for users who need to create app registrations.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/delegate-app-roles"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.5.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["CM-7"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/policies/authorizationPolicy"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "CIS recommends restricting app registration to admins only."
+}

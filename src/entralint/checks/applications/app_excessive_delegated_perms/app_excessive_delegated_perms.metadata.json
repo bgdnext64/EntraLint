@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_app_009",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Detect applications requesting excessive delegated permissions",
+    "ServiceName": "Applications",
+    "Severity": "MEDIUM",
+    "ResourceType": "Application",
+    "Description": "Checks for application registrations that request more than 10 delegated permissions (Scope type) from Microsoft Graph. Excessive delegated scopes increase the attack surface if a user consents to the application.",
+    "Risk": "Applications requesting many delegated permissions gain broad access when a user consents. If the application is compromised or malicious, the attacker can leverage all consented scopes to access user data, mail, files, and directory information.",
+    "Remediation": {
+        "Recommendation": "Review applications requesting more than 10 delegated permissions. Remove unnecessary scopes and apply least-privilege principles. Use application permissions with admin consent where appropriate instead of broad delegated scopes.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity-platform/permissions-consent-overview"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["AC-6"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/applications"],
+    "RequiredPermissions": ["Application.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Excessive permissions increase blast radius of application compromise."
+}

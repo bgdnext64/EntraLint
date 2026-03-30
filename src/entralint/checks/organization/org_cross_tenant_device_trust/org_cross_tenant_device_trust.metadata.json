@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_org_008",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review cross-tenant inbound trust for external device compliance claims",
+    "ServiceName": "Organization",
+    "Severity": "LOW",
+    "ResourceType": "CrossTenantAccessPolicy",
+    "Description": "Checks whether the default cross-tenant access policy trusts compliant device or hybrid Azure AD joined device claims from external tenants.",
+    "Risk": "Trusting external device compliance claims means your CA policies accept device state assertions from other organizations. External tenants may have weaker device compliance policies, effectively bypassing your device requirements for B2B users.",
+    "Remediation": {
+        "Recommendation": "Review whether trusting external device compliance claims is appropriate. Consider disabling device trust by default and enabling it only for specific trusted partner tenants.",
+        "Url": "https://learn.microsoft.com/en-us/entra/external-id/cross-tenant-access-settings-b2b-collaboration#to-change-inbound-trust-settings-for-mfa-and-device-claims"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["AC-19"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/policies/crossTenantAccessPolicy/default"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "External device trust may weaken device compliance enforcement."
+}

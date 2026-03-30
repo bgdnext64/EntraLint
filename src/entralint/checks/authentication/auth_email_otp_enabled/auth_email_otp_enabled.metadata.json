@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_auth_009",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure email one-time passcode authentication is reviewed",
+    "ServiceName": "Authentication",
+    "Severity": "LOW",
+    "ResourceType": "AuthenticationMethodsPolicy",
+    "Description": "Checks whether email OTP authentication is enabled. Email OTP allows guest users to authenticate using a one-time code sent to their email, which provides weaker assurance than Microsoft Authenticator or FIDO2.",
+    "Risk": "Email OTP relies on the security of the guest user's email account, which may not have MFA enabled. If the guest's email is compromised, the attacker can authenticate to your tenant. This is a weaker authentication method compared to Authenticator or FIDO2.",
+    "Remediation": {
+        "Recommendation": "Consider disabling email OTP if all guest users can use Microsoft Authenticator or FIDO2. If email OTP must remain enabled for B2B scenarios, ensure guest accounts are subject to Conditional Access policies with sign-in risk evaluation.",
+        "Url": "https://learn.microsoft.com/en-us/entra/external-id/one-time-passcode"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["IA-2(1)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/policies/authenticationMethodsPolicy"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Email OTP is a convenience feature that trades security for accessibility."
+}

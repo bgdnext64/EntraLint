@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_auth_010",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure certificate-based authentication is enabled",
+    "ServiceName": "Authentication",
+    "Severity": "MEDIUM",
+    "ResourceType": "AuthenticationMethodsPolicy",
+    "Description": "Checks whether X.509 certificate-based authentication (CBA) is enabled. CBA provides phishing-resistant authentication and is recommended for high-security environments alongside FIDO2.",
+    "Risk": "Without certificate-based authentication, the tenant lacks an enterprise-grade phishing-resistant authentication method for scenarios where FIDO2 keys are impractical (e.g., smartcard-based authentication, VPN access, legacy systems). CBA complements FIDO2 for comprehensive phishing-resistant coverage.",
+    "Remediation": {
+        "Recommendation": "Enable X.509 certificate-based authentication in the Entra ID authentication methods policy. Configure trusted certificate authorities and certificate-to-user mapping rules.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/authentication/how-to-certificate-based-authentication"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["IA-2(12)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/policies/authenticationMethodsPolicy"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Certificate-based auth is a phishing-resistant method alongside FIDO2."
+}

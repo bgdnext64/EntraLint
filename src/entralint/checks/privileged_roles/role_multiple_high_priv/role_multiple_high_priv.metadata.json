@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_role_008",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Detect users with multiple high-privilege role assignments",
+    "ServiceName": "PrivilegedRoles",
+    "Severity": "HIGH",
+    "ResourceType": "DirectoryRole",
+    "Description": "Checks whether any user is assigned two or more high-privilege directory roles simultaneously. Role accumulation violates the principle of least privilege and increases blast radius if the account is compromised.",
+    "Risk": "A user holding multiple high-privilege roles (e.g., Global Admin + Exchange Admin) has an unnecessarily large blast radius. If the account is compromised, the attacker gains the combined privileges of all assigned roles. This also indicates a lack of role separation.",
+    "Remediation": {
+        "Recommendation": "Review users with multiple high-privilege roles and remove unnecessary assignments. Use separate accounts for different administrative functions. Implement PIM for just-in-time activation of roles.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["1.1.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-6(2)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/roleManagement/directory/roleAssignments"],
+    "RequiredPermissions": ["RoleManagement.Read.Directory"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Separation of duties is a fundamental security principle."
+}

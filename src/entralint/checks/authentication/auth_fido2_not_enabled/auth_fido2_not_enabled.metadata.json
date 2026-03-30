@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_auth_007",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure FIDO2 security keys are enabled for phishing-resistant MFA",
+    "ServiceName": "Authentication",
+    "Severity": "HIGH",
+    "ResourceType": "AuthenticationMethodsPolicy",
+    "Description": "Checks whether FIDO2 security keys are enabled in the authentication methods policy. FIDO2 provides phishing-resistant MFA that cannot be intercepted by adversary-in-the-middle attacks.",
+    "Risk": "Without FIDO2 enabled, the tenant lacks a phishing-resistant MFA option. Traditional MFA methods (SMS, phone call, even push notifications) can be bypassed by real-time phishing proxies (e.g., Evilginx). FIDO2 keys are bound to the origin and cannot be phished.",
+    "Remediation": {
+        "Recommendation": "Enable FIDO2 security keys in the Entra ID authentication methods policy. Target at least privileged users and gradually expand to all users. Consider Windows Hello for Business as an additional phishing-resistant option.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/authentication/how-to-enable-passkey-fido2"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.3.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["IA-2(6)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/policies/authenticationMethodsPolicy"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "CISA and NIST strongly recommend phishing-resistant MFA. FIDO2 is the gold standard."
+}

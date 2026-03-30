@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_user_008",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Detect stale guest accounts with no recent sign-in",
+    "ServiceName": "Users",
+    "Severity": "MEDIUM",
+    "ResourceType": "User",
+    "Description": "Checks for guest accounts that have not signed in for 90 days or more. Stale guest accounts are dormant attack surface that should be removed or disabled.",
+    "Risk": "Guest accounts that have not been used in over 90 days may belong to former collaborators or vendors. These dormant accounts are targets for credential stuffing and B2B account takeover. Each stale guest is an unnecessary entry point into the tenant.",
+    "Remediation": {
+        "Recommendation": "Review guest accounts with no sign-in activity in the last 90 days. Remove or disable accounts that are no longer needed. Implement guest access reviews to automate lifecycle management.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/users/clean-up-stale-guest-accounts"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.8.2"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-2(3)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/users"],
+    "RequiredPermissions": ["User.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Stale guest cleanup is a well-known identity hygiene best practice."
+}

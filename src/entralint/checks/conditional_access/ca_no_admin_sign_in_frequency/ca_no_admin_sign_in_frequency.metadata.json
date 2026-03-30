@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_ca_014",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure sign-in frequency is configured for admin sessions",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "MEDIUM",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Checks whether any enabled Conditional Access policy enforces sign-in frequency for privileged admin roles. Without sign-in frequency controls, admin sessions can persist indefinitely via refresh tokens.",
+    "Risk": "Without sign-in frequency limits, admin refresh tokens can be valid for extended periods. A stolen admin refresh token can be used to maintain persistent access without re-authentication. Short sign-in frequency (e.g., 4-8 hours) limits the window of token abuse for privileged sessions.",
+    "Remediation": {
+        "Recommendation": "Create a Conditional Access policy targeting admin roles that enforces sign-in frequency (e.g., every 4 hours). Apply this to admin roles like Global Admin, Security Admin, and Privileged Role Admin.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-session-lifetime"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["AC-12"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Sign-in frequency for admin sessions is a defense-in-depth measure against token theft."
+}

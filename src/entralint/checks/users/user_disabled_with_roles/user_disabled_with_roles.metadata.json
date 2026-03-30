@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_user_009",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Detect disabled user accounts with active role assignments",
+    "ServiceName": "Users",
+    "Severity": "HIGH",
+    "ResourceType": "User",
+    "Description": "Checks whether any disabled user accounts still have directory role assignments. Disabled accounts with active roles indicate incomplete offboarding and may be exploitable if re-enabled.",
+    "Risk": "Disabled accounts with active role assignments are a ticking time bomb. If re-enabled (accidentally or maliciously), the account immediately regains its privileged access. This pattern also indicates weak offboarding procedures.",
+    "Remediation": {
+        "Recommendation": "Remove all directory role assignments from disabled user accounts. Implement automated offboarding workflows that revoke roles before disabling accounts.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["1.1.5"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-2(3)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/users", "/roleManagement/directory/roleAssignments"],
+    "RequiredPermissions": ["User.Read.All", "RoleManagement.Read.Directory"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Incomplete offboarding is a common finding in penetration tests."
+}
