@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import contextmanager
 from typing import Annotated
 
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
 from entralint.auth.provider import AuthMethod, AuthProvider
 from entralint.cli.output import display_scan_summary
@@ -29,6 +31,13 @@ from entralint.reports.sarif_report import format_sarif
 
 console = Console()
 
+
+@contextmanager
+def _nullcontext():
+    """No-op context manager for when status spinner is suppressed."""
+    yield
+
+
 SEVERITY_STYLES = {
     "CRITICAL": "bold red",
     "HIGH": "red",
@@ -45,218 +54,193 @@ async def _fetch_and_scan(
 ) -> list[Finding]:
     """Fetch Graph data and run checks."""
     granted_permissions: set[str] = set()
+    fetch_results: list[tuple[str, str, str]] = []  # (label, status_icon, detail)
+
+    def _ok(label: str, detail: str = "") -> None:
+        fetch_results.append((label, "[green]OK[/green]", detail))
+
+    def _fail(label: str, detail: str = "") -> None:
+        fetch_results.append((label, "[red]FAIL[/red]", detail))
 
     async with GraphClient(access_token=token) as graph:
-        # --- Fetch Conditional Access policies ---
-        if not quiet:
-            console.print("  Fetching Conditional Access policies...", end=" ")
-        try:
-            raw_policies = await graph.get("/identity/conditionalAccess/policies")
-            policies_list = raw_policies.get("value", [])
-            policies = [ConditionalAccessPolicy.model_validate(p) for p in policies_list]
-            granted_permissions.add("Policy.Read.All")
-            if not quiet:
-                console.print(f"[green]✓[/green] ({len(policies)} policies)")
-        except Exception as exc:
-            policies = []
-            if not quiet:
-                console.print(f"[red]✗[/red] ({exc})")
+        with console.status(
+            "[bold cyan]Collecting data from Microsoft Graph API...",
+            spinner="dots",
+        ) if not quiet else _nullcontext():
 
-        # --- Fetch Applications ---
-        if not quiet:
-            console.print("  Fetching applications...", end=" ")
-        try:
-            raw_apps = await graph.get_all_pages(
-                "/applications?$expand=owners($select=id,displayName)"
-            )
-            apps = [Application.model_validate(a) for a in raw_apps]
-            granted_permissions.add("Application.Read.All")
-            if not quiet:
-                console.print(f"[green]✓[/green] ({len(apps)} apps)")
-        except Exception as exc:
-            apps = []
-            if not quiet:
-                console.print(f"[red]✗[/red] ({exc})")
-
-        # --- Fetch Users (with signInActivity if P1+) ---
-        if not quiet:
-            console.print("  Fetching users...", end=" ")
-        try:
-            raw_users = await graph.get_all_pages(
-                "/users?$select=id,displayName,userPrincipalName,"
-                "accountEnabled,userType,createdDateTime,signInActivity"
-            )
-            users = [User.model_validate(u) for u in raw_users]
-            granted_permissions.add("User.Read.All")
-            if not quiet:
-                console.print(f"[green]✓[/green] ({len(users)} users)")
-        except Exception:
-            # Fallback without signInActivity (requires P1 license)
+            # --- Conditional Access policies ---
             try:
-                raw_users = await graph.get_all_pages("/users")
+                raw_policies = await graph.get(
+                    "/identity/conditionalAccess/policies"
+                )
+                policies_list = raw_policies.get("value", [])
+                policies = [
+                    ConditionalAccessPolicy.model_validate(p) for p in policies_list
+                ]
+                granted_permissions.add("Policy.Read.All")
+                _ok("Conditional Access policies", f"{len(policies)} policies")
+            except Exception as exc:
+                policies = []
+                _fail("Conditional Access policies", str(exc))
+
+            # --- Applications ---
+            try:
+                raw_apps = await graph.get_all_pages(
+                    "/applications?$expand=owners($select=id,displayName)"
+                )
+                apps = [Application.model_validate(a) for a in raw_apps]
+                granted_permissions.add("Application.Read.All")
+                _ok("Applications", f"{len(apps)} apps")
+            except Exception as exc:
+                apps = []
+                _fail("Applications", str(exc))
+
+            # --- Users (with signInActivity if P1+) ---
+            try:
+                raw_users = await graph.get_all_pages(
+                    "/users?$select=id,displayName,userPrincipalName,"
+                    "accountEnabled,userType,createdDateTime,signInActivity"
+                )
                 users = [User.model_validate(u) for u in raw_users]
                 granted_permissions.add("User.Read.All")
-                if not quiet:
-                    console.print(f"[green]✓[/green] ({len(users)} users, no sign-in data)")
-            except Exception as exc:
-                users = []
-                if not quiet:
-                    console.print(f"[red]✗[/red] ({exc})")
-
-        # --- Fetch Security Defaults policy ---
-        security_defaults: dict = {}
-        if not quiet:
-            console.print(
-                "  Fetching security defaults policy...", end=" "
-            )
-        try:
-            security_defaults = await graph.get(
-                "/policies/identitySecurityDefaultsEnforcementPolicy"
-            )
-            if not quiet:
-                status = "enabled" if security_defaults.get("isEnabled") else "disabled"
-                console.print(f"[green]✓[/green] ({status})")
-        except Exception as exc:
-            if not quiet:
-                console.print(f"[red]✗[/red] ({exc})")
-
-        # --- Fetch Service Principals ---
-        if not quiet:
-            console.print("  Fetching service principals...", end=" ")
-        try:
-            raw_sps = await graph.get_all_pages("/servicePrincipals")
-            service_principals = [ServicePrincipal.model_validate(sp) for sp in raw_sps]
-            granted_permissions.add("Application.Read.All")
-            if not quiet:
-                console.print(
-                    f"[green]✓[/green] ({len(service_principals)} service principals)"
-                )
-        except Exception as exc:
-            service_principals = []
-            if not quiet:
-                console.print(f"[red]✗[/red] ({exc})")
-
-        # --- Fetch Directory Role Assignments ---
-        if not quiet:
-            console.print("  Fetching role assignments...", end=" ")
-        try:
-            raw_assignments = await graph.get_all_pages(
-                "/roleManagement/directory/roleAssignments"
-                "?$expand=principal($select=id,displayName)"
-            )
-            role_assignments = [
-                DirectoryRoleAssignment.model_validate(a) for a in raw_assignments
-            ]
-            granted_permissions.add("RoleManagement.Read.Directory")
-            if not quiet:
-                console.print(f"[green]✓[/green] ({len(role_assignments)} assignments)")
-        except Exception as exc:
-            role_assignments = []
-            if not quiet:
-                console.print(f"[red]✗[/red] ({exc})")
-
-        # --- Fetch Authorization Policy ---
-        authorization_policy: dict = {}
-        if not quiet:
-            console.print("  Fetching authorization policy...", end=" ")
-        try:
-            authorization_policy = await graph.get(
-                "/policies/authorizationPolicy"
-            )
-            granted_permissions.add("Policy.Read.All")
-            if not quiet:
-                console.print("[green]✓[/green]")
-        except Exception as exc:
-            if not quiet:
-                console.print(f"[red]✗[/red] ({exc})")
-        # --- Fetch OAuth2 Permission Grants (delegated permissions) ---
-        oauth2_grants: list[dict] = []
-        if not quiet:
-            console.print("  Fetching delegated permission grants...", end=" ")
-        try:
-            oauth2_grants = await graph.get_all_pages(
-                "/oauth2PermissionGrants"
-            )
-            if not quiet:
-                console.print(
-                    f"[green]\u2713[/green] ({len(oauth2_grants)} grants)"
-                )
-        except Exception as exc:
-            if not quiet:
-                console.print(f"[red]\u2717[/red] ({exc})")
-
-        # --- Fetch App Role Assignments (application permissions on SPs) ---
-        all_app_role_assignments: list[AppRoleAssignment] = []
-        if not quiet:
-            console.print("  Fetching app role assignments...", end=" ")
-        try:
-            for sp in service_principals:
+                _ok("Users", f"{len(users)} users")
+            except Exception:
                 try:
-                    raw_sp_ara = await graph.get(
-                        f"/servicePrincipals/{sp.id}/appRoleAssignments"
-                    )
-                    for item in raw_sp_ara.get("value", []):
-                        all_app_role_assignments.append(
-                            AppRoleAssignment.model_validate(item)
+                    raw_users = await graph.get_all_pages("/users")
+                    users = [User.model_validate(u) for u in raw_users]
+                    granted_permissions.add("User.Read.All")
+                    _ok("Users", f"{len(users)} users, no sign-in data")
+                except Exception as exc:
+                    users = []
+                    _fail("Users", str(exc))
+
+            # --- Security Defaults policy ---
+            security_defaults: dict = {}
+            try:
+                security_defaults = await graph.get(
+                    "/policies/identitySecurityDefaultsEnforcementPolicy"
+                )
+                status = "enabled" if security_defaults.get("isEnabled") else "disabled"
+                _ok("Security defaults", status)
+            except Exception as exc:
+                _fail("Security defaults", str(exc))
+
+            # --- Service Principals ---
+            try:
+                raw_sps = await graph.get_all_pages("/servicePrincipals")
+                service_principals = [
+                    ServicePrincipal.model_validate(sp) for sp in raw_sps
+                ]
+                granted_permissions.add("Application.Read.All")
+                _ok("Service principals", f"{len(service_principals)} SPs")
+            except Exception as exc:
+                service_principals = []
+                _fail("Service principals", str(exc))
+
+            # --- Directory Role Assignments ---
+            try:
+                raw_assignments = await graph.get_all_pages(
+                    "/roleManagement/directory/roleAssignments"
+                    "?$expand=principal($select=id,displayName)"
+                )
+                role_assignments = [
+                    DirectoryRoleAssignment.model_validate(a)
+                    for a in raw_assignments
+                ]
+                granted_permissions.add("RoleManagement.Read.Directory")
+                _ok("Role assignments", f"{len(role_assignments)} assignments")
+            except Exception as exc:
+                role_assignments = []
+                _fail("Role assignments", str(exc))
+
+            # --- Authorization Policy ---
+            authorization_policy: dict = {}
+            try:
+                authorization_policy = await graph.get(
+                    "/policies/authorizationPolicy"
+                )
+                granted_permissions.add("Policy.Read.All")
+                _ok("Authorization policy")
+            except Exception as exc:
+                _fail("Authorization policy", str(exc))
+
+            # --- OAuth2 Permission Grants ---
+            oauth2_grants: list[dict] = []
+            try:
+                oauth2_grants = await graph.get_all_pages(
+                    "/oauth2PermissionGrants"
+                )
+                _ok("Delegated permission grants", f"{len(oauth2_grants)} grants")
+            except Exception as exc:
+                _fail("Delegated permission grants", str(exc))
+
+            # --- App Role Assignments ---
+            all_app_role_assignments: list[AppRoleAssignment] = []
+            try:
+                for sp in service_principals:
+                    try:
+                        raw_sp_ara = await graph.get(
+                            f"/servicePrincipals/{sp.id}/appRoleAssignments"
                         )
-                except Exception:
-                    continue
-            if not quiet:
-                console.print(
-                    f"[green]\u2713[/green] "
-                    f"({len(all_app_role_assignments)} assignments)"
+                        for item in raw_sp_ara.get("value", []):
+                            all_app_role_assignments.append(
+                                AppRoleAssignment.model_validate(item)
+                            )
+                    except Exception:
+                        continue
+                _ok(
+                    "App role assignments",
+                    f"{len(all_app_role_assignments)} assignments",
                 )
-        except Exception as exc:
-            if not quiet:
-                console.print(f"[red]\u2717[/red] ({exc})")
+            except Exception as exc:
+                _fail("App role assignments", str(exc))
 
-        # --- Fetch Authentication Methods Policy ---
-        auth_methods_policy: dict = {}
-        if not quiet:
-            console.print("  Fetching authentication methods policy...", end=" ")
-        try:
-            auth_methods_policy = await graph.get(
-                "/policies/authenticationMethodsPolicy"
-            )
-            granted_permissions.add("Policy.Read.All")
-            if not quiet:
-                console.print("[green]\u2713[/green]")
-        except Exception as exc:
-            if not quiet:
-                console.print(f"[red]\u2717[/red] ({exc})")
-
-        # --- Fetch Cross-Tenant Access Default Policy ---
-        cross_tenant_policy: dict = {}
-        if not quiet:
-            console.print("  Fetching cross-tenant access policy...", end=" ")
-        try:
-            cross_tenant_policy = await graph.get(
-                "/policies/crossTenantAccessPolicy/default"
-            )
-            granted_permissions.add("Policy.Read.All")
-            if not quiet:
-                console.print("[green]\u2713[/green]")
-        except Exception as exc:
-            if not quiet:
-                console.print(f"[red]\u2717[/red] ({exc})")
-
-        # --- Fetch Named Locations ---
-        named_locations: list[dict] = []
-        if not quiet:
-            console.print("  Fetching named locations...", end=" ")
-        try:
-            raw_locations = await graph.get(
-                "/identity/conditionalAccess/namedLocations"
-            )
-            named_locations = raw_locations.get("value", [])
-            granted_permissions.add("Policy.Read.All")
-            if not quiet:
-                console.print(
-                    f"[green]\u2713[/green] ({len(named_locations)} locations)"
+            # --- Authentication Methods Policy ---
+            auth_methods_policy: dict = {}
+            try:
+                auth_methods_policy = await graph.get(
+                    "/policies/authenticationMethodsPolicy"
                 )
-        except Exception as exc:
-            if not quiet:
-                console.print(f"[red]\u2717[/red] ({exc})")
+                granted_permissions.add("Policy.Read.All")
+                _ok("Authentication methods policy")
+            except Exception as exc:
+                _fail("Authentication methods policy", str(exc))
+
+            # --- Cross-Tenant Access Default Policy ---
+            cross_tenant_policy: dict = {}
+            try:
+                cross_tenant_policy = await graph.get(
+                    "/policies/crossTenantAccessPolicy/default"
+                )
+                granted_permissions.add("Policy.Read.All")
+                _ok("Cross-tenant access policy")
+            except Exception as exc:
+                _fail("Cross-tenant access policy", str(exc))
+
+            # --- Named Locations ---
+            named_locations: list[dict] = []
+            try:
+                raw_locations = await graph.get(
+                    "/identity/conditionalAccess/namedLocations"
+                )
+                named_locations = raw_locations.get("value", [])
+                granted_permissions.add("Policy.Read.All")
+                _ok("Named locations", f"{len(named_locations)} locations")
+            except Exception as exc:
+                _fail("Named locations", str(exc))
+
+        # --- Display fetch results as a compact table ---
+        if not quiet:
+            tbl = Table(
+                show_header=False, box=None, padding=(0, 1),
+                show_edge=False,
+            )
+            tbl.add_column(width=4)  # status icon
+            tbl.add_column(min_width=32)  # label
+            tbl.add_column(style="dim")  # detail
+            for label, icon, detail in fetch_results:
+                tbl.add_row(icon, label, detail)
+            console.print(tbl)
 
         # --- Build TenantContext ---
         context = TenantContext(
@@ -390,7 +374,7 @@ def scan(
                 border_style="cyan",
             )
         )
-        console.print("\nCollecting data from Microsoft Graph API...")
+        console.print()
 
     # --- Setup engine with filters ---
     engine = CheckEngine()
