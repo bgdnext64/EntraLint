@@ -13,7 +13,7 @@ from rich.table import Table
 
 from entralint.auth.provider import AuthMethod, AuthProvider
 from entralint.cli.output import display_scan_summary
-from entralint.core.check import Finding, Status
+from entralint.core.check import SEVERITY_RANK, Finding, Severity, Status
 from entralint.core.context import TenantContext
 from entralint.core.engine import CheckEngine
 from entralint.core.models import (
@@ -328,6 +328,13 @@ def scan(
     offline: Annotated[
         bool, typer.Option("--offline", help="Run checks against cached data only")
     ] = False,
+    fail_on: Annotated[
+        str,
+        typer.Option(
+            "--fail-on",
+            help="Severity threshold for non-zero exit (default: medium)",
+        ),
+    ] = "medium",
     quiet: Annotated[
         bool, typer.Option("--quiet", "-q", help="Suppress console output (CI mode)")
     ] = False,
@@ -442,7 +449,29 @@ def scan(
             print(report_text)
 
     # --- Exit code ---
-    has_failures = any(f.status == Status.FAIL for f in findings)
+    fail_on_lower = fail_on.lower()
+    if fail_on_lower == "none":
+        raise typer.Exit(code=0)
+
+    threshold_map = {
+        "critical": Severity.CRITICAL,
+        "high": Severity.HIGH,
+        "medium": Severity.MEDIUM,
+        "low": Severity.LOW,
+    }
+    threshold = threshold_map.get(fail_on_lower)
+    if threshold is None:
+        console.print(
+            f"[red]Unknown --fail-on value '{fail_on}'. "
+            "Use: critical, high, medium, low, none[/red]"
+        )
+        raise typer.Exit(code=2)
+
+    threshold_rank = SEVERITY_RANK[threshold]
+    has_failures = any(
+        f.status == Status.FAIL and SEVERITY_RANK.get(f.severity, 99) <= threshold_rank
+        for f in findings
+    )
     raise typer.Exit(code=1 if has_failures else 0)
 
 

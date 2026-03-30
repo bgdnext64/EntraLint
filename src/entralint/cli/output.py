@@ -60,10 +60,14 @@ def display_scan_summary(findings: list[Finding]) -> None:
         in (Status.SKIPPED_LICENSE, Status.SKIPPED_PERMISSION, Status.SKIPPED_DEPENDENCY)
     )
 
+    # Count unique check IDs to distinguish checks from findings.
+    unique_checks = len({f.check_id for f in findings})
+
     console.print()
     console.rule("[bold]Summary[/bold]")
     console.print(
-        f"  Checks: {total}    "
+        f"  Checks: {unique_checks}    "
+        f"Findings: {total}    "
         f"[green]Passed: {passed}[/green]    "
         f"[red]Failed: {failed}[/red]    "
         f"[yellow]Skipped: {skipped}[/yellow]    "

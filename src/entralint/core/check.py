@@ -19,6 +19,15 @@ class Severity(StrEnum):
     LOW = "LOW"
 
 
+# Numeric rank for severity comparison (lower = more severe).
+SEVERITY_RANK: dict[Severity, int] = {
+    Severity.CRITICAL: 0,
+    Severity.HIGH: 1,
+    Severity.MEDIUM: 2,
+    Severity.LOW: 3,
+}
+
+
 class Status(StrEnum):
     PASS = "PASS"
     FAIL = "FAIL"
