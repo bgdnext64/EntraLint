@@ -327,9 +327,13 @@ def scan(
         str | None,
         typer.Option(help="Minimum severity filter (critical,high,medium,low)"),
     ] = None,
-    output: Annotated[
-        str, typer.Option(help="Output format: json, html, csv, sarif, md")
-    ] = "json",
+    fmt: Annotated[
+        str,
+        typer.Option(
+            "--format", "-f",
+            help="Output format: table (default), json, sarif",
+        ),
+    ] = "table",
     output_file: Annotated[
         str | None, typer.Option("--output-file", help="Write report to this path")
     ] = None,
@@ -371,8 +375,13 @@ def scan(
         )
         raise typer.Exit(code=1)
 
+    # For structured output formats piped to stdout, suppress Rich console output.
+    # When writing to a file, show table output alongside.
+    fmt_lower = fmt.lower()
+    suppress_console = quiet or (fmt_lower != "table" and not output_file)
+
     # --- Print banner ---
-    if not quiet:
+    if not suppress_console:
         console.print(
             Panel(
                 f"Tenant: {tenant}\nProfile: {profile or 'default'}",
@@ -393,7 +402,7 @@ def scan(
         _fetch_and_scan(
             token=token,
             engine=engine,
-            quiet=quiet,
+            quiet=suppress_console,
             verbose=verbose,
         )
     )
@@ -408,15 +417,18 @@ def scan(
         )
 
     # --- Summary ---
-    if not quiet:
+    if not suppress_console:
         display_scan_summary(findings)
 
     # --- Output ---
+    if fmt_lower not in ("table", "json", "sarif"):
+        console.print(f"[red]Unknown format '{fmt}'. Use: table, json, sarif[/red]")
+        raise typer.Exit(code=2)
+
     report_text: str | None = None
-    if output == "json":
+    if fmt_lower == "json":
         report_text = format_json(findings)
-    elif output == "sarif":
-        # Build metadata lookup so SARIF rules get full descriptions
+    elif fmt_lower == "sarif":
         meta_lookup = {
             c.metadata.check_id: c.metadata.model_dump(mode="json")
             for c in engine.discover()
@@ -427,10 +439,10 @@ def scan(
         if output_file:
             with open(output_file, "w", encoding="utf-8") as fh:
                 fh.write(report_text)
-            if not quiet:
-                console.print(f"\n[dim]{output.upper()} report written to {output_file}[/dim]")
-        elif quiet:
-            # In quiet mode with no file, print to stdout for piping
+            console.print(
+                f"\n[dim]{fmt_lower.upper()} report written to {output_file}[/dim]"
+            )
+        else:
             print(report_text)
 
     # --- Exit code ---
