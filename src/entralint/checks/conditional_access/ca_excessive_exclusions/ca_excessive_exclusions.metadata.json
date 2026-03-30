@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_ca_011",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review Conditional Access policies with excessive user exclusions",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "HIGH",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Flags CA policies that exclude more than 5 individual users or groups. Excessive exclusions weaken the policy's effectiveness and create coverage gaps.",
+    "Risk": "Each excluded user or group is a potential bypass vector. Attackers who compromise excluded accounts are not subject to otherwise mandatory controls like MFA or device compliance.",
+    "Remediation": {
+        "Recommendation": "Review and minimize exclusions. Use dedicated break-glass accounts and groups rather than individual user exclusions.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-users-groups"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.1.1"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "AI-generated framework mappings — verify before citing in compliance reports."
+}

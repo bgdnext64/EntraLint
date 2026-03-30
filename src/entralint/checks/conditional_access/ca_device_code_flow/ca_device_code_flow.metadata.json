@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_ca_010",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure device code flow is blocked via Conditional Access",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "HIGH",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Verifies that at least one enabled Conditional Access policy blocks the device code authentication flow, which is commonly abused in phishing attacks.",
+    "Risk": "Device code flow allows an attacker to phish users into authenticating on the attacker's device by presenting a legitimate Microsoft login page with a code. This bypasses traditional phishing protections.",
+    "Remediation": {
+        "Recommendation": "Create a CA policy that blocks device code flow for all users (or all except break-glass accounts) by targeting the 'Device code flow' client app type condition.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-conditions#device-code-flow"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.2.12"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "AI-generated framework mappings — verify before citing in compliance reports."
+}

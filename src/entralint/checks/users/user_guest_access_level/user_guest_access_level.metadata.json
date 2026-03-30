@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_user_004",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure guest user access is restricted to their own directory objects",
+    "ServiceName": "Users",
+    "Severity": "HIGH",
+    "ResourceType": "AuthorizationPolicy",
+    "Description": "Verifies that the guestUserRoleId in the authorization policy restricts guest users to limited access rather than the same access as member users.",
+    "Risk": "If guest users have the same access as members, external users can enumerate all users, groups, and applications in your directory, facilitating reconnaissance for targeted attacks.",
+    "Remediation": {
+        "Recommendation": "Set guestUserRoleId to 2af84b1e-32c8-42b7-82bc-daa82404023b (restricted access) in the authorization policy.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/users/users-restrict-guest-permissions"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.3.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.2"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/policies/authorizationPolicy"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "AI-generated framework mappings — verify before citing in compliance reports."
+}

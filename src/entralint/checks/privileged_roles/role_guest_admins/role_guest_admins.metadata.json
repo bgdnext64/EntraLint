@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_role_004",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure no guest users hold privileged directory roles",
+    "ServiceName": "PrivilegedRoles",
+    "Severity": "CRITICAL",
+    "ResourceType": "DirectoryRoleAssignment",
+    "Description": "Detects guest (external) users who hold privileged directory roles such as Global Administrator, Security Administrator, or other high-privilege roles.",
+    "Risk": "Guest accounts are managed outside your tenant and may not follow your security policies. A compromised external account with admin privileges gives an attacker full control over your directory.",
+    "Remediation": {
+        "Recommendation": "Remove all guest users from privileged directory roles. If external admin access is needed, use dedicated cloud-only accounts within your tenant.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices"
+    },
+    "Frameworks": [
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-6"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/roleManagement/directory/roleAssignments", "/users"],
+    "RequiredPermissions": ["RoleManagement.Read.Directory", "User.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "AI-generated framework mappings — verify before citing in compliance reports."
+}

@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_ca_009",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure at least one Conditional Access policy is fully enabled (not report-only)",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "CRITICAL",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Verifies that at least one Conditional Access policy is in 'enabled' state. If all policies are in 'enabledForReportingButNotEnforced' (report-only) mode, no access controls are actually enforced.",
+    "Risk": "Report-only policies log events but do not block or challenge sign-ins. An attacker can bypass all Conditional Access protections if no policy is enforced.",
+    "Remediation": {
+        "Recommendation": "Review report-only policies and transition critical ones (MFA, legacy auth block) to enabled state.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-report-only"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.1.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.3.1"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "AI-generated framework mappings — verify before citing in compliance reports."
+}

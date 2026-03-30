@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_ca_012",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure compliant or managed device is required for admin access",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "HIGH",
+    "ResourceType": "ConditionalAccessPolicy",
+    "Description": "Verifies that at least one enabled CA policy requires a compliant or hybrid-joined device for privileged admin roles.",
+    "Risk": "Without device compliance requirements, compromised admin credentials can be used from any unmanaged device, including attacker-controlled machines.",
+    "Remediation": {
+        "Recommendation": "Create a CA policy targeting admin roles that requires a compliant or hybrid Azure AD joined device.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-policy-compliant-device-admin"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.2.8"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-17"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/policies"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "AI-generated framework mappings — verify before citing in compliance reports."
+}

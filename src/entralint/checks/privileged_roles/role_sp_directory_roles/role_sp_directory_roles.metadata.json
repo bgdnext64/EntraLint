@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_role_005",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Detect service principals with privileged directory role assignments",
+    "ServiceName": "PrivilegedRoles",
+    "Severity": "CRITICAL",
+    "ResourceType": "DirectoryRoleAssignment",
+    "Description": "Identifies service principals (applications) that hold privileged directory roles such as Global Administrator or Application Administrator.",
+    "Risk": "Service principals with directory roles can perform administrative actions without user interaction. A compromised app credential with Global Admin role gives an attacker complete tenant control.",
+    "Remediation": {
+        "Recommendation": "Replace directory role assignments with scoped application permissions. Use least-privilege API permissions instead of broad directory roles.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.3.1.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-6"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/roleManagement/directory/roleAssignments"],
+    "RequiredPermissions": ["RoleManagement.Read.Directory"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "AI-generated framework mappings — verify before citing in compliance reports."
+}
