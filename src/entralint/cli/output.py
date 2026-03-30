@@ -74,3 +74,21 @@ def display_scan_summary(findings: list[Finding]) -> None:
         f"[red]Errors: {errors}[/red]"
     )
     console.print()
+
+
+def display_baseline_delta(delta: object) -> None:
+    """Print baseline comparison results.
+
+    Accepts a BaselineDelta but typed as object to avoid circular imports.
+    """
+    new_count = len(delta.new)  # type: ignore[attr-defined]
+    existing_count = len(delta.existing)  # type: ignore[attr-defined]
+    resolved_count = len(delta.resolved)  # type: ignore[attr-defined]
+
+    console.print(
+        f"  [bold]Baseline:[/bold]  "
+        f"[red]New: {new_count}[/red]    "
+        f"[dim]Existing: {existing_count}[/dim]    "
+        f"[green]Resolved: {resolved_count}[/green]"
+    )
+    console.print()

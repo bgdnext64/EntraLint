@@ -13,7 +13,13 @@ from rich.panel import Panel
 from rich.table import Table
 
 from entralint.auth.provider import AuthMethod, AuthProvider
-from entralint.cli.output import display_scan_summary
+from entralint.cli.output import display_baseline_delta, display_scan_summary
+from entralint.core.baseline import (
+    DEFAULT_BASELINE_FILE,
+    compare,
+    load_baseline,
+    save_baseline,
+)
 from entralint.core.check import SEVERITY_RANK, Finding, Severity, Status
 from entralint.core.config import load_config_auto
 from entralint.core.context import TenantContext
@@ -271,7 +277,7 @@ async def _fetch_and_scan(
         return findings
 
 
-def _print_finding(finding: Finding, verbose: bool) -> None:
+def _print_finding(finding: Finding, verbose: bool, *, tag: str = "") -> None:
     """Print a single finding to the console."""
     style = SEVERITY_STYLES.get(finding.severity.value, "white")
     status_icon = {
@@ -283,7 +289,7 @@ def _print_finding(finding: Finding, verbose: bool) -> None:
         Status.ERROR: "[red] ERROR [/red]",
     }
     icon = status_icon.get(finding.status, "[dim] ???? [/dim]")
-    console.print(f" {icon}  {finding.check_id:18s} {finding.title}")
+    console.print(f" {icon}  {finding.check_id:18s} {finding.title}{tag}")
     if verbose and finding.description:
         console.print(f"              [dim]{finding.description}[/dim]")
 
@@ -338,6 +344,27 @@ def scan(
     no_config: Annotated[
         bool,
         typer.Option("--no-config", help="Ignore config file"),
+    ] = False,
+    baseline: Annotated[
+        str | None,
+        typer.Option(
+            "--baseline",
+            help="Path to baseline file for comparison (default: .entralint-baseline.json)",
+        ),
+    ] = None,
+    update_baseline: Annotated[
+        bool,
+        typer.Option(
+            "--update-baseline",
+            help="Save current scan as the new baseline",
+        ),
+    ] = False,
+    fail_on_new: Annotated[
+        bool,
+        typer.Option(
+            "--fail-on-new",
+            help="Exit non-zero only for NEW findings (not in baseline)",
+        ),
     ] = False,
     quiet: Annotated[
         bool, typer.Option("--quiet", "-q", help="Suppress console output (CI mode)")
@@ -436,14 +463,51 @@ def scan(
                 with contextlib.suppress(ValueError):
                     f.severity = Severity(override.severity.upper())
 
+    # --- Baseline: save / compare ---
+    baseline_path = baseline or (cfg.baseline if cfg else None)
+    delta = None
+
+    if update_baseline:
+        out_path = baseline_path or DEFAULT_BASELINE_FILE
+        saved = save_baseline(findings, out_path)
+        if not suppress_console:
+            fail_count = sum(1 for f in findings if f.status == Status.FAIL)
+            console.print(
+                f"\n[green]Baseline saved:[/green] {saved} "
+                f"({fail_count} findings)"
+            )
+    elif baseline_path:
+        try:
+            snap = load_baseline(baseline_path)
+            delta = compare(findings, snap)
+        except FileNotFoundError:
+            if not suppress_console:
+                console.print(
+                    f"[yellow]Baseline file not found: {baseline_path} "
+                    "(run with --update-baseline to create one)[/yellow]"
+                )
+
     # --- Stream findings to console ---
     if not suppress_console:
+        # Build a set of NEW fingerprints for annotation.
+        new_fps: set[str] = set()
+        if delta:
+            from entralint.core.baseline import _fingerprint
+
+            new_fps = {_fingerprint(f) for f in delta.new}
+
         for finding in findings:
-            _print_finding(finding, verbose)
+            tag = ""
+            if delta and finding.status == Status.FAIL:
+                fp = _fingerprint(finding)
+                tag = " [red bold]NEW[/red bold]" if fp in new_fps else ""
+            _print_finding(finding, verbose, tag=tag)
 
     # --- Summary ---
     if not suppress_console:
         display_scan_summary(findings)
+        if delta:
+            display_baseline_delta(delta)
 
     # --- Output ---
     if fmt_lower not in ("table", "json", "sarif", "html"):
@@ -482,6 +546,10 @@ def scan(
             print(report_text)
 
     # --- Exit code ---
+    # When --update-baseline is used, always exit 0.
+    if update_baseline:
+        raise typer.Exit(code=0)
+
     fail_on_lower = effective_fail_on.lower()
     if fail_on_lower == "none":
         raise typer.Exit(code=0)
@@ -501,9 +569,13 @@ def scan(
         raise typer.Exit(code=2)
 
     threshold_rank = SEVERITY_RANK[threshold]
+
+    # When --fail-on-new is set and we have a delta, only NEW findings count.
+    check_findings = delta.new if fail_on_new and delta else findings
+
     has_failures = any(
         f.status == Status.FAIL and SEVERITY_RANK.get(f.severity, 99) <= threshold_rank
-        for f in findings
+        for f in check_findings
     )
     raise typer.Exit(code=1 if has_failures else 0)
 

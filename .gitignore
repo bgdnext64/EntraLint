@@ -47,6 +47,8 @@ coverage.xml
 
 # EntraLint local data
 .entralint/
+.entralint-baseline.json
+entralint-report.html
 
 # Reports (generated)
 entralint-report*.html
