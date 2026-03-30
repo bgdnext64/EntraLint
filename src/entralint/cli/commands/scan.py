@@ -23,6 +23,7 @@ from entralint.core.models import (
     User,
 )
 from entralint.graph.client import GraphClient
+from entralint.reports.html_report import format_html
 from entralint.reports.json_report import format_json
 from entralint.reports.sarif_report import format_sarif
 
@@ -331,7 +332,7 @@ def scan(
         str,
         typer.Option(
             "--format", "-f",
-            help="Output format: table (default), json, sarif",
+            help="Output format: table (default), json, sarif, html",
         ),
     ] = "table",
     output_file: Annotated[
@@ -421,8 +422,8 @@ def scan(
         display_scan_summary(findings)
 
     # --- Output ---
-    if fmt_lower not in ("table", "json", "sarif"):
-        console.print(f"[red]Unknown format '{fmt}'. Use: table, json, sarif[/red]")
+    if fmt_lower not in ("table", "json", "sarif", "html"):
+        console.print(f"[red]Unknown format '{fmt}'. Use: table, json, sarif, html[/red]")
         raise typer.Exit(code=2)
 
     report_text: str | None = None
@@ -434,6 +435,17 @@ def scan(
             for c in engine.discover()
         }
         report_text = format_sarif(findings, check_metadata=meta_lookup)
+    elif fmt_lower == "html":
+        meta_lookup = {
+            c.metadata.check_id: c.metadata.model_dump(mode="json")
+            for c in engine.discover()
+        }
+        report_text = format_html(
+            findings, tenant_id=tenant, check_metadata=meta_lookup,
+        )
+        # Default to file output for HTML
+        if not output_file:
+            output_file = "entralint-report.html"
 
     if report_text is not None:
         if output_file:

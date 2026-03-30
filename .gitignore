@@ -49,9 +49,9 @@ coverage.xml
 .entralint/
 
 # Reports (generated)
-entralint-report-*.html
-entralint-report-*.json
-entralint-report-*.csv
+entralint-report*.html
+entralint-report*.json
+entralint-report*.csv
 entralint-report-*.sarif
 entralint-report-*.pdf
 
