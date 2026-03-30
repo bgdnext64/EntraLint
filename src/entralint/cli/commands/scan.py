@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from contextlib import contextmanager
 from typing import Annotated
 
@@ -14,6 +15,7 @@ from rich.table import Table
 from entralint.auth.provider import AuthMethod, AuthProvider
 from entralint.cli.output import display_scan_summary
 from entralint.core.check import SEVERITY_RANK, Finding, Severity, Status
+from entralint.core.config import load_config_auto
 from entralint.core.context import TenantContext
 from entralint.core.engine import CheckEngine
 from entralint.core.models import (
@@ -50,7 +52,6 @@ async def _fetch_and_scan(
     token: str,
     engine: CheckEngine,
     quiet: bool,
-    verbose: bool,
 ) -> list[Finding]:
     """Fetch Graph data and run checks."""
     granted_permissions: set[str] = set()
@@ -267,11 +268,6 @@ async def _fetch_and_scan(
         engine.build_execution_order()
         findings = engine.execute(context)
 
-        # --- Stream findings to console ---
-        if not quiet:
-            for finding in findings:
-                _print_finding(finding, verbose)
-
         return findings
 
 
@@ -329,12 +325,20 @@ def scan(
         bool, typer.Option("--offline", help="Run checks against cached data only")
     ] = False,
     fail_on: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--fail-on",
             help="Severity threshold for non-zero exit (default: medium)",
         ),
-    ] = "medium",
+    ] = None,
+    config: Annotated[
+        str | None,
+        typer.Option("--config", help="Path to .entralint.yaml config file"),
+    ] = None,
+    no_config: Annotated[
+        bool,
+        typer.Option("--no-config", help="Ignore config file"),
+    ] = False,
     quiet: Annotated[
         bool, typer.Option("--quiet", "-q", help="Suppress console output (CI mode)")
     ] = False,
@@ -372,6 +376,10 @@ def scan(
     fmt_lower = fmt.lower()
     suppress_console = quiet or (fmt_lower != "table" and not output_file)
 
+    # --- Load config ---
+    cfg = load_config_auto(config, disabled=no_config)
+    effective_fail_on = fail_on or (cfg.fail_on if cfg else None) or "medium"
+
     # --- Print banner ---
     if not suppress_console:
         console.print(
@@ -389,13 +397,18 @@ def scan(
     severity_list = [s.strip() for s in severity.split(",")] if severity else None
     check_ids = [c.strip() for c in checks.split(",")] if checks else None
 
+    # Merge config-level exclusions into check_ids filter
+    exclude_set: set[str] = set()
+    if cfg:
+        exclude_set.update(cfg.exclude_checks)
+        exclude_set.update(r.check for r in cfg.suppress)
+
     # --- Run scan ---
     findings = asyncio.run(
         _fetch_and_scan(
             token=token,
             engine=engine,
             quiet=suppress_console,
-            verbose=verbose,
         )
     )
 
@@ -407,6 +420,25 @@ def scan(
             check_ids=check_ids,
             framework=framework,
         )
+
+    # --- Apply config: suppressions + severity overrides ---
+    if cfg:
+        # Remove suppressed findings
+        if exclude_set:
+            findings = [
+                f for f in findings if f.check_id not in exclude_set
+            ]
+        # Apply severity overrides
+        for f in findings:
+            override = cfg.overrides.get(f.check_id)
+            if override:
+                with contextlib.suppress(ValueError):
+                    f.severity = Severity(override.severity.upper())
+
+    # --- Stream findings to console ---
+    if not suppress_console:
+        for finding in findings:
+            _print_finding(finding, verbose)
 
     # --- Summary ---
     if not suppress_console:
@@ -449,7 +481,7 @@ def scan(
             print(report_text)
 
     # --- Exit code ---
-    fail_on_lower = fail_on.lower()
+    fail_on_lower = effective_fail_on.lower()
     if fail_on_lower == "none":
         raise typer.Exit(code=0)
 
