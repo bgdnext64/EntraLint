@@ -16,7 +16,7 @@
         {"framework": "NIST_800-53", "controls": ["AC-6"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
     ],
     "GraphAPIEndpoints": ["/oauth2PermissionGrants"],
-    "RequiredPermissions": ["DelegatedPermissionGrant.ReadWrite.All"],
+    "RequiredPermissions": ["DelegatedPermissionGrant.Read.All"],
     "RequiredLicense": null,
     "DependsOn": [],
     "SourceNotes": "Framework control IDs were AI-generated. Excessive delegated permission review is a well-known Entra ID security best practice."

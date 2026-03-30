@@ -1,0 +1,24 @@
+{
+    "CheckID": "entraid_role_003",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure emergency access (break-glass) accounts exist",
+    "ServiceName": "PrivilegedRoles",
+    "Severity": "HIGH",
+    "ResourceType": "User",
+    "Description": "Checks whether at least one emergency access (break-glass) account exists in the tenant. These are cloud-only Global Administrator accounts excluded from Conditional Access policies, intended for use when normal admin access fails (e.g., MFA outage, federation failure).",
+    "Risk": "Without break-glass accounts, an MFA service outage, misconfigured Conditional Access policy, or federated identity provider failure can lock all administrators out of the tenant. Recovery requires a Microsoft support ticket and can take days.",
+    "Remediation": {
+        "Recommendation": "Create at least two cloud-only break-glass accounts with Global Administrator role. Exclude them from all Conditional Access policies. Use long, complex passwords stored in a physical safe. Monitor sign-in activity on these accounts with alerts.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/security-emergency-access"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.2.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.1.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-2(1)"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/roleManagement/directory/roleAssignments", "/users"],
+    "RequiredPermissions": ["RoleManagement.Read.Directory", "User.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Break-glass accounts are a Microsoft and CIS best practice. CIS control IDs are AI-generated."
+}

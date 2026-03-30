@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_ca_008",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure named locations are defined for Conditional Access",
+    "ServiceName": "ConditionalAccess",
+    "Severity": "MEDIUM",
+    "ResourceType": "NamedLocation",
+    "Description": "Checks whether at least one named location (IP-based or country-based) is configured. Named locations are essential for geo-fencing, blocking sign-ins from untrusted regions, and defining trusted network perimeters in Conditional Access policies.",
+    "Risk": "Without named locations, Conditional Access policies cannot enforce location-based controls — no trusted IP ranges, no country-level blocking, and no impossible-travel detection context. This removes a key defense layer against foreign nation-state actors.",
+    "Remediation": {
+        "Recommendation": "Define named locations for your trusted IP ranges (corporate networks, VPNs) and permitted countries. Use these in Conditional Access policies to block or restrict sign-ins from unknown locations.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-assignment-network"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.2.5"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-2(5)"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/identity/conditionalAccess/namedLocations"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Named locations are a foundational CA building block. CIS control ID is AI-generated."
+}

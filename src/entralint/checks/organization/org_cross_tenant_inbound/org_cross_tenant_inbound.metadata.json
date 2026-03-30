@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_org_004",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review cross-tenant access default inbound policy",
+    "ServiceName": "Organization",
+    "Severity": "MEDIUM",
+    "ResourceType": "CrossTenantAccessPolicy",
+    "Description": "Checks whether the default cross-tenant access policy allows inbound B2B collaboration and B2B direct connect from all external tenants. Unrestricted inbound access increases the risk of external account compromise spreading to your tenant.",
+    "Risk": "When inbound cross-tenant access defaults allow all external tenants, any compromised account in any external organization can be invited as a guest or connect via B2B direct connect. This expands your attack surface to every Entra ID tenant globally.",
+    "Remediation": {
+        "Recommendation": "Review and restrict the default inbound cross-tenant access policy. Consider blocking inbound B2B collaboration by default and explicitly allowing only trusted partner organizations. Use cross-tenant access settings to control which external apps and users can access your resources.",
+        "Url": "https://learn.microsoft.com/en-us/entra/external-id/cross-tenant-access-settings-b2b-collaboration"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.8.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-20"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/policies/crossTenantAccessPolicy/default"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Cross-tenant access review is a key B2B security control. CIS control ID is AI-generated."
+}

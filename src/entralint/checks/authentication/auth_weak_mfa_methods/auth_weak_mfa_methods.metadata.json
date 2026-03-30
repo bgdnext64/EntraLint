@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_auth_001",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure weak MFA methods (SMS, voice) are disabled",
+    "ServiceName": "Authentication",
+    "Severity": "MEDIUM",
+    "ResourceType": "AuthenticationMethodsPolicy",
+    "Description": "Checks whether SMS or voice call authentication methods are enabled in the tenant authentication methods policy. These methods are vulnerable to SIM-swapping and SS7 interception attacks.",
+    "Risk": "SMS and voice calls are the weakest MFA factors. SIM-swap attacks allow adversaries to intercept one-time codes. NIST SP 800-63B deprecated SMS as an out-of-band authenticator. Attackers routinely target SMS-based MFA in credential phishing campaigns.",
+    "Remediation": {
+        "Recommendation": "Disable SMS and voice call authentication methods in the Entra ID authentication methods policy. Migrate users to Microsoft Authenticator, FIDO2 security keys, or Windows Hello for Business.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/authentication/concept-authentication-methods"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.3.5"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["IA-2(6)"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/policies/authenticationMethodsPolicy"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "NIST SP 800-63B explicitly discourages SMS-based authentication. CIS control ID is AI-generated."
+}

@@ -178,6 +178,7 @@ class User(BaseModel):
     account_enabled: bool = Field(default=True, alias="accountEnabled")
     user_type: str = Field(default="Member", alias="userType")
     created_date_time: str | None = Field(default=None, alias="createdDateTime")
+    sign_in_activity: dict[str, Any] | None = Field(default=None, alias="signInActivity")
 
     model_config = {"populate_by_name": True}
 

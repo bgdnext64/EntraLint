@@ -47,6 +47,9 @@ class TenantContext(BaseModel):
     # Delegated permission grants (raw dicts for now)
     oauth2_permission_grants: list[dict[str, Any]] = Field(default_factory=list)
 
+    # Named locations
+    named_locations: list[dict[str, Any]] = Field(default_factory=list)
+
     # Policies (raw dicts until we model them fully)
     security_defaults_policy: dict[str, Any] = Field(default_factory=dict)
     authentication_methods_policy: dict[str, Any] = Field(default_factory=dict)

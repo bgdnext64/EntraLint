@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_org_005",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure self-service password reset is enabled for all users",
+    "ServiceName": "Organization",
+    "Severity": "MEDIUM",
+    "ResourceType": "AuthenticationMethodsPolicy",
+    "Description": "Checks whether self-service password reset (SSPR) is enabled for all users or only a subset. When SSPR is not enabled, users must contact the helpdesk, which delays recovery and increases social engineering risk on helpdesk staff.",
+    "Risk": "Without SSPR, helpdesk staff become a target for social engineering to reset passwords on behalf of attackers. SSPR with proper MFA reduces this attack vector and improves user productivity.",
+    "Remediation": {
+        "Recommendation": "Enable self-service password reset for all users in the Entra ID authentication methods policy. Require at least two authentication methods for SSPR verification.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/authentication/tutorial-enable-sspr"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.2.4.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["IA-5(1)"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/policies/authenticationMethodsPolicy"],
+    "RequiredPermissions": ["Policy.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "SSPR is a well-known identity hygiene best practice. CIS control ID is AI-generated."
+}

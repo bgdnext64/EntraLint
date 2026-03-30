@@ -77,19 +77,30 @@ async def _fetch_and_scan(
             if not quiet:
                 console.print(f"[red]✗[/red] ({exc})")
 
-        # --- Fetch Users ---
+        # --- Fetch Users (with signInActivity if P1+) ---
         if not quiet:
             console.print("  Fetching users...", end=" ")
         try:
-            raw_users = await graph.get_all_pages("/users")
+            raw_users = await graph.get_all_pages(
+                "/users?$select=id,displayName,userPrincipalName,"
+                "accountEnabled,userType,createdDateTime,signInActivity"
+            )
             users = [User.model_validate(u) for u in raw_users]
             granted_permissions.add("User.Read.All")
             if not quiet:
                 console.print(f"[green]✓[/green] ({len(users)} users)")
-        except Exception as exc:
-            users = []
-            if not quiet:
-                console.print(f"[red]✗[/red] ({exc})")
+        except Exception:
+            # Fallback without signInActivity (requires P1 license)
+            try:
+                raw_users = await graph.get_all_pages("/users")
+                users = [User.model_validate(u) for u in raw_users]
+                granted_permissions.add("User.Read.All")
+                if not quiet:
+                    console.print(f"[green]✓[/green] ({len(users)} users, no sign-in data)")
+            except Exception as exc:
+                users = []
+                if not quiet:
+                    console.print(f"[red]✗[/red] ({exc})")
 
         # --- Fetch Security Defaults policy ---
         security_defaults: dict = {}
@@ -197,6 +208,55 @@ async def _fetch_and_scan(
         except Exception as exc:
             if not quiet:
                 console.print(f"[red]\u2717[/red] ({exc})")
+
+        # --- Fetch Authentication Methods Policy ---
+        auth_methods_policy: dict = {}
+        if not quiet:
+            console.print("  Fetching authentication methods policy...", end=" ")
+        try:
+            auth_methods_policy = await graph.get(
+                "/policies/authenticationMethodsPolicy"
+            )
+            granted_permissions.add("Policy.Read.All")
+            if not quiet:
+                console.print("[green]\u2713[/green]")
+        except Exception as exc:
+            if not quiet:
+                console.print(f"[red]\u2717[/red] ({exc})")
+
+        # --- Fetch Cross-Tenant Access Default Policy ---
+        cross_tenant_policy: dict = {}
+        if not quiet:
+            console.print("  Fetching cross-tenant access policy...", end=" ")
+        try:
+            cross_tenant_policy = await graph.get(
+                "/policies/crossTenantAccessPolicy/default"
+            )
+            granted_permissions.add("Policy.Read.All")
+            if not quiet:
+                console.print("[green]\u2713[/green]")
+        except Exception as exc:
+            if not quiet:
+                console.print(f"[red]\u2717[/red] ({exc})")
+
+        # --- Fetch Named Locations ---
+        named_locations: list[dict] = []
+        if not quiet:
+            console.print("  Fetching named locations...", end=" ")
+        try:
+            raw_locations = await graph.get(
+                "/identity/conditionalAccess/namedLocations"
+            )
+            named_locations = raw_locations.get("value", [])
+            granted_permissions.add("Policy.Read.All")
+            if not quiet:
+                console.print(
+                    f"[green]\u2713[/green] ({len(named_locations)} locations)"
+                )
+        except Exception as exc:
+            if not quiet:
+                console.print(f"[red]\u2717[/red] ({exc})")
+
         # --- Build TenantContext ---
         context = TenantContext(
             conditional_access_policies=policies,
@@ -206,8 +266,11 @@ async def _fetch_and_scan(
             role_assignments=role_assignments,
             app_role_assignments=all_app_role_assignments,
             oauth2_permission_grants=oauth2_grants,
+            named_locations=named_locations,
             security_defaults_policy=security_defaults,
+            authentication_methods_policy=auth_methods_policy,
             authorization_policy=authorization_policy,
+            cross_tenant_access_policy=cross_tenant_policy,
             granted_permissions=granted_permissions,
         )
 

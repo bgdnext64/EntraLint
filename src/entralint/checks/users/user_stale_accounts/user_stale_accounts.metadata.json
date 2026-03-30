@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_user_003",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Identify stale user accounts with no recent sign-in activity",
+    "ServiceName": "Users",
+    "Severity": "MEDIUM",
+    "ResourceType": "User",
+    "Description": "Identifies enabled user accounts that have not signed in for 90 or more days. Stale accounts are attractive targets for attackers because they are less likely to be monitored and their compromise may go unnoticed.",
+    "Risk": "Stale accounts represent abandoned credentials. If compromised via password spray or credential stuffing, the legitimate owner is unlikely to notice. These accounts often retain group memberships and access rights from their active period.",
+    "Remediation": {
+        "Recommendation": "Review stale accounts and disable or delete those that are no longer needed. Implement Entra ID access reviews to automatically flag inactive accounts. For accounts that must remain active, ensure MFA is enforced.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/users/clean-up-stale-guest-accounts"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.1.1"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"},
+        {"framework": "NIST_800-53", "controls": ["AC-2(3)"], "verified": false, "source": "AI-generated mapping — not yet verified against published benchmark"}
+    ],
+    "GraphAPIEndpoints": ["/users"],
+    "RequiredPermissions": ["User.Read.All", "AuditLog.Read.All"],
+    "RequiredLicense": "P1",
+    "DependsOn": [],
+    "SourceNotes": "Requires Entra ID P1+ for signInActivity data. CIS control ID is AI-generated."
+}
