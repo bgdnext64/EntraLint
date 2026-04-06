@@ -653,6 +653,24 @@ class TestAgentNoDescription:
         assert len(findings) == 1
         assert findings[0].status == Status.FAIL
 
+    def test_fail_info_all_null_values(self):
+        """Graph API returns info dict with all-null URLs — treat as empty."""
+        bp = _blueprint(
+            description=None,
+            info={
+                "logoUrl": None,
+                "marketingUrl": None,
+                "privacyStatementUrl": None,
+                "supportUrl": None,
+                "termsOfServiceUrl": None,
+            },
+        )
+        findings = AgentNoDescription().execute(
+            _ctx(agent_identity_blueprints=[bp])
+        )
+        assert len(findings) == 1
+        assert findings[0].status == Status.FAIL
+
     def test_fail_agent_no_display_name(self):
         agent = _agent(
             id="some-guid", display_name="some-guid"

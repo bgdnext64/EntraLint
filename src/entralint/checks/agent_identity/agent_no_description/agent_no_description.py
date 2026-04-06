@@ -56,11 +56,18 @@ class AgentNoDescription(BaseCheck):
     def __init__(self) -> None:
         super().__init__(metadata=self.metadata)
 
+    @staticmethod
+    def _has_meaningful_info(info: dict | None) -> bool:
+        """Check if the info dict has any non-null values."""
+        if not info:
+            return False
+        return any(v for v in info.values() if v is not None)
+
     def execute(self, context: TenantContext) -> list[Finding]:
         findings: list[Finding] = []
 
         for bp in context.agent_identity_blueprints:
-            if not bp.description and not bp.info:
+            if not bp.description and not self._has_meaningful_info(bp.info):
                 findings.append(Finding(
                     check_id=self.metadata.check_id,
                     check_version=self.metadata.check_version,
