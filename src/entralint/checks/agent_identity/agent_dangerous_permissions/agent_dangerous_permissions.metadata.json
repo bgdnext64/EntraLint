@@ -1,0 +1,24 @@
+{
+    "CheckID": "entraid_agent_001",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure agent identities do not hold dangerous permissions",
+    "ServiceName": "AgentIdentity",
+    "Severity": "CRITICAL",
+    "ResourceType": "AgentIdentity",
+    "Description": "Checks whether any agent identity has been granted high-risk application permissions such as Files.ReadWrite.All, User.ReadWrite.All, or Directory.ReadWrite.All. These permissions should be blocked by the Entra Agent ID platform but may exist due to legacy grants or platform bypass.",
+    "Risk": "Agent identities with dangerous permissions can read or modify sensitive data across the entire tenant. Files.ReadWrite.All grants access to all SharePoint and OneDrive files. Directory.ReadWrite.All enables modification of all directory objects.",
+    "Remediation": {
+        "Recommendation": "Remove the dangerous application permissions from the agent identity via DELETE /agentIdentities/{id}/appRoleAssignments/{assignmentId}. Replace with least-privilege scopes appropriate for the agent's function.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/agentid-platform-overview"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.3.5"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.6.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-6"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/agentIdentities", "/agentIdentities/{id}/appRoleAssignments"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Dangerous permission GUIDs are well-known Microsoft Graph app role identifiers."
+}

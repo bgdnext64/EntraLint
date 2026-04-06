@@ -7,6 +7,9 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from entralint.core.models import (
+    AgentIdentity,
+    AgentIdentityBlueprint,
+    AgentIdentityBlueprintPrincipal,
     Application,
     AppRoleAssignment,
     ConditionalAccessPolicy,
@@ -58,6 +61,15 @@ class TenantContext(BaseModel):
 
     # Computed intermediate results shared between dependent checks
     computed: dict[str, Any] = Field(default_factory=dict)
+
+    # Agent Identity (Microsoft Entra Agent ID — GA v1.0)
+    agent_identities: list[AgentIdentity] = Field(default_factory=list)
+    agent_identity_blueprints: list[AgentIdentityBlueprint] = Field(
+        default_factory=list
+    )
+    agent_identity_blueprint_principals: list[AgentIdentityBlueprintPrincipal] = Field(
+        default_factory=list
+    )
 
     # Granted permissions (populated during pre-scan validation)
     granted_permissions: set[str] = Field(default_factory=set)

@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_agent_005",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure agent identities are created by authorized applications",
+    "ServiceName": "AgentIdentity",
+    "Severity": "HIGH",
+    "ResourceType": "AgentIdentity",
+    "Description": "Checks the createdByAppId field on agent identities to detect agents that were created by non-admin or unauthorized applications, such as user self-service via Copilot Studio without admin governance.",
+    "Risk": "Agents created by unauthorized applications bypass admin governance review. The creating application determines the initial security posture of the agent identity.",
+    "Remediation": {
+        "Recommendation": "Review the creating application and verify it is an approved agent provisioning tool. Restrict agent creation to authorized applications via Entra ID app management policies.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.5.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["CM-3"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/agentIdentities"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "createdByAppId was added to application and servicePrincipal resources in March 2026."
+}

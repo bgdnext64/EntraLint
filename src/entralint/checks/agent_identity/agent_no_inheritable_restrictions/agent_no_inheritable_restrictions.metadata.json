@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_agent_010",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure agent blueprints define inheritable permission restrictions",
+    "ServiceName": "AgentIdentity",
+    "Severity": "MEDIUM",
+    "ResourceType": "AgentIdentityBlueprint",
+    "Description": "Checks whether agent identity blueprints have inheritablePermissions configured. An empty or unset inheritablePermissions list means there is no declared intent for what permissions agent instances should receive.",
+    "Risk": "Blueprints without inheritable permission restrictions provide no signal about intended permission scope. This makes permissions review harder and increases the chance of over-provisioning.",
+    "Remediation": {
+        "Recommendation": "Configure inheritablePermissions on the blueprint with either enumeratedScopes (explicit list) or noScopes (if agents should not inherit permissions automatically).",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/inheritablepermission"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["AC-6"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/agentIdentityBlueprints/{id}/inheritablePermissions"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "inheritablePermissions is a blueprint-level relationship that controls scope inheritance for agent instances."
+}

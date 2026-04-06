@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_agent_002",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure agent blueprints do not use allAllowedScopes inheritance",
+    "ServiceName": "AgentIdentity",
+    "Severity": "CRITICAL",
+    "ResourceType": "AgentIdentityBlueprint",
+    "Description": "Checks whether any agent identity blueprint has inheritablePermissions configured with allAllowedScopes, which allows agent instances to inherit any permission without explicit enumeration.",
+    "Risk": "A blueprint using allAllowedScopes grants agent instances carte-blanche to inherit any permission the blueprint is authorized for. This defeats least-privilege governance and makes it impossible to predict what permissions agent instances will acquire.",
+    "Remediation": {
+        "Recommendation": "Update the blueprint's inheritablePermissions to use enumeratedScopes with an explicit list of allowed permission scopes, or noScopes if agents should not inherit permissions automatically.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentityblueprint"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.1.5.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-6"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/agentIdentityBlueprints", "/agentIdentityBlueprints/{id}/inheritablePermissions"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "The scopeCollectionKind value 'allAllowedScopes' is the most permissive option for inheritable permissions."
+}

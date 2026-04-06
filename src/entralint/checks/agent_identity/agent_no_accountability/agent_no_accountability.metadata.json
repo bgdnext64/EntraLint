@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_agent_006",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure all agent identities and blueprints have owners or sponsors",
+    "ServiceName": "AgentIdentity",
+    "Severity": "HIGH",
+    "ResourceType": "AgentIdentity",
+    "Description": "Checks that every agent identity and agent identity blueprint has at least one owner or sponsor assigned. Sponsors are required during blueprint creation but may be removed afterward.",
+    "Risk": "Agent identities without owners or sponsors have no accountable party for their permissions, lifecycle, and security posture. Orphaned agents are invisible to governance processes.",
+    "Remediation": {
+        "Recommendation": "Assign at least one owner and one sponsor to the agent identity via POST /agentIdentities/{id}/owners and POST /agentIdentities/{id}/sponsors.",
+        "Url": "https://learn.microsoft.com/en-us/entra/agent-id/identity-platform/agent-owners-sponsors-managers"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.3.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-6(5)"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/agentIdentities/{id}/owners", "/agentIdentities/{id}/sponsors", "/agentIdentityBlueprints/{id}/owners", "/agentIdentityBlueprints/{id}/sponsors"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Sponsors are a governance concept specific to Entra Agent ID."
+}

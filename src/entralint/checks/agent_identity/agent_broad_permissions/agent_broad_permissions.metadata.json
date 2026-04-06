@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_agent_004",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure agent identities do not have overly broad permission scope",
+    "ServiceName": "AgentIdentity",
+    "Severity": "HIGH",
+    "ResourceType": "AgentIdentity",
+    "Description": "Flags agent identities that have 5 or more application permission grants, indicating an overly broad scope of access that violates least-privilege principles.",
+    "Risk": "An agent with many application permissions has a large blast radius. If compromised, the attacker gains access to multiple resource types across the tenant.",
+    "Remediation": {
+        "Recommendation": "Review the agent's permission grants and remove any that are not essential for its function. Consider splitting the agent into multiple single-purpose agents with narrower scopes.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"
+    },
+    "Frameworks": [
+        {"framework": "CIS_M365_v5", "controls": ["5.3.1"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "NIST_800-53", "controls": ["AC-6"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/agentIdentities", "/agentIdentities/{id}/appRoleAssignments"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Threshold of 5 permissions is a configurable heuristic based on least-privilege best practices."
+}

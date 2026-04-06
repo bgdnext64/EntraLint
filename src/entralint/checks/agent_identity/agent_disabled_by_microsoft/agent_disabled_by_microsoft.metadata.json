@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_agent_011",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure no agent identity is disabled by Microsoft",
+    "ServiceName": "AgentIdentity",
+    "Severity": "MEDIUM",
+    "ResourceType": "AgentIdentity",
+    "Description": "Checks whether any agent identity has disabledByMicrosoftStatus set to a non-null value such as DisabledDueToViolationOfServicesAgreement. This indicates Microsoft has flagged the agent for suspicious, abusive, or malicious activity.",
+    "Risk": "An agent disabled by Microsoft may have been involved in suspicious or abusive activity. The underlying blueprint or application may be compromised. Other agents from the same blueprint should be reviewed.",
+    "Remediation": {
+        "Recommendation": "Investigate the disabled agent's activity logs. Review all other agent identities created from the same blueprint. Contact Microsoft support if the disablement is unexpected.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["SI-4"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/agentIdentities"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "disabledByMicrosoftStatus is inherited from servicePrincipal. Possible values: null, NotDisabled, DisabledDueToViolationOfServicesAgreement."
+}

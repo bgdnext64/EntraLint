@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_agent_007",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Review external agent blueprint principals",
+    "ServiceName": "AgentIdentity",
+    "Severity": "MEDIUM",
+    "ResourceType": "AgentIdentityBlueprintPrincipal",
+    "Description": "Identifies agent blueprint principals where appOwnerOrganizationId does not match the current tenant, indicating a third-party agent operating in your directory.",
+    "Risk": "External agent blueprints are published by other organizations. The tenant admin has limited visibility into their code, data handling, and update lifecycle. Broad permissions on external agents multiply this risk.",
+    "Remediation": {
+        "Recommendation": "Review the external agent's publisher, permissions, and data access. Validate the agent's verified publisher status. Remove or restrict agents from untrusted publishers.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentityblueprintprincipal"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["IA-8"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.1"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/agentIdentityBlueprintPrincipals"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "External agents identified by comparing appOwnerOrganizationId to the tenant ID."
+}

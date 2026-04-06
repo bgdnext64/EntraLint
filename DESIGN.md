@@ -23,8 +23,9 @@
 13. [Multi-Tenant Support Model](#multi-tenant-support-model)
 14. [Report Generation Formats](#report-generation-formats)
 15. [Extensibility and Plugin System](#extensibility-and-plugin-system)
-16. [GitHub Repository Structure](#github-repository-structure)
-17. [Testing Strategy](#testing-strategy)
+16. [Agentic Identity Security](#agentic-identity-security)
+17. [GitHub Repository Structure](#github-repository-structure)
+18. [Testing Strategy](#testing-strategy)
 
 ---
 
@@ -912,6 +913,323 @@ Built-in hooks include:
 - Slack/Teams notification on new Critical findings
 - Webhook POST for SIEM integration
 - Jira/ServiceNow ticket creation
+
+---
+
+## Agentic Identity Security
+
+### The Problem
+
+AI agents are the fastest-growing identity category in Entra ID. As of March 2026, Microsoft has shipped the **Entra Agent ID** platform with first-class Graph API support (GA v1.0), making agent identities a formally distinct directory object type — not a heuristic overlay on service principals. Copilot Studio agents, Copilot extensions, custom agents built with Semantic Kernel or AutoGen, and third-party AI services now register through dedicated agent identity APIs.
+
+The same governance failures that plague traditional app registrations — excessive permissions, missing owners, stale credentials, shadow IT — are repeating at accelerated pace with agents, compounded by three agent-specific risks:
+
+1. **Broader default permissions.** Agents typically need cross-service access (Mail + Files + Calendar + Teams) to be useful, creating a larger blast radius per identity than single-purpose apps.
+2. **Delegation chains.** Agent A calls Agent B with forwarded permissions, creating transitive access paths that are invisible in static permission analysis.
+3. **User self-service provisioning.** Copilot Studio and similar platforms enable non-developers to create agents that acquire organizational permissions, bypassing traditional app registration governance.
+
+Microsoft has responded with built-in guardrails — a [blocked permissions list](#blocked-permissions) prevents agents from acquiring the most dangerous Graph API scopes — but no existing scanner provides security posture checks against the agent identity surface. EntraLint is the first tool to provide dedicated agent identity checks using the GA Agent Identity APIs.
+
+### Microsoft Entra Agent ID Architecture
+
+Microsoft Entra Agent ID introduces three first-class resource types in the Graph API, each inheriting from existing identity primitives:
+
+| Resource Type | Inherits From | Purpose | Key Discriminator |
+|---|---|---|---|
+| **`agentIdentityBlueprint`** | `application` | Template defining an agent type, its permissions, and which scopes agent instances can inherit | `@odata.type: "#microsoft.graph.agentIdentityBlueprint"` |
+| **`agentIdentityBlueprintPrincipal`** | `servicePrincipal` | Tenant-specific instantiation of a blueprint — controls tenant-level configuration, owners, and sponsors | `@odata.type: "#microsoft.graph.agentIdentityBlueprintPrincipal"` |
+| **`agentIdentity`** | `servicePrincipal` | Individual agent instance that authenticates and acts in the directory | `@odata.type: "#microsoft.graph.agentIdentity"`, `servicePrincipalType: "ServiceIdentity"` |
+
+Key governance concepts introduced with Agent ID:
+
+- **Sponsors.** Users or service principals who can authorize and manage the lifecycle of agent identity instances. Required during blueprint creation. Distinct from owners.
+- **Inheritable permissions.** Blueprints define `inheritablePermissions` that control which scopes agent instances can automatically receive — with subtypes `allAllowedScopes`, `enumeratedScopes`, and `noScopes`.
+- **Blocked permissions.** Microsoft globally blocks high-risk Graph permissions for agents at the platform level (see [Blocked Permissions](#blocked-permissions) below).
+- **`createdByAppId`.** Added to both `application` and `servicePrincipal` resources, enabling provenance tracking for agent identities.
+
+### Graph API Endpoints for Agent Discovery
+
+Agent identity discovery uses dedicated GA endpoints — no heuristic classification required:
+
+| Endpoint | Status | Purpose |
+|---|---|---|
+| `GET /agentIdentityBlueprints` | GA (v1.0) | List all agent identity blueprints (templates) |
+| `GET /agentIdentityBlueprints/{id}` | GA (v1.0) | Get a specific blueprint with properties and relationships |
+| `GET /agentIdentityBlueprintPrincipals` | GA (v1.0) | List all blueprint principals (tenant-level blueprint instances) |
+| `GET /agentIdentityBlueprintPrincipals/{id}/appRoleAssignments` | GA (v1.0) | Application permissions granted to blueprint principals |
+| `GET /agentIdentityBlueprintPrincipals/{id}/oauth2PermissionGrants` | GA (v1.0) | Delegated permissions consented for blueprint principals |
+| `GET /agentIdentityBlueprintPrincipals/{id}/owners` | GA (v1.0) | Owners of a blueprint principal |
+| `GET /agentIdentityBlueprintPrincipals/{id}/sponsors` | GA (v1.0) | Sponsors who authorize agent lifecycle |
+| `GET /agentIdentities` | GA (v1.0) | List all agent identity instances |
+| `GET /agentIdentities/{id}` | GA (v1.0) | Get agent identity with properties |
+| `GET /agentIdentities/{id}/appRoleAssignments` | GA (v1.0) | Application permissions for a specific agent |
+| `GET /agentIdentities/{id}/oauth2PermissionGrants` | GA (v1.0) | Delegated permissions for a specific agent |
+| `GET /agentIdentities/{id}/owners` | GA (v1.0) | Owners of an agent identity |
+| `GET /agentIdentities/{id}/sponsors` | GA (v1.0) | Sponsors of an agent identity |
+| `GET /agentIdentities/{id}/memberOf` | GA (v1.0) | Group/role memberships |
+| `GET /agentIdentityBlueprints/{id}/inheritablePermissions` | GA (v1.0) | Scopes that agent instances can automatically inherit |
+
+**Agent registry endpoints** (beta, extending to agent card manifests and collections):
+
+| Endpoint | Status | Purpose |
+|---|---|---|
+| `GET /agentRegistry/agentCardManifests` | Beta | Agent card manifests in the registry |
+| `GET /agentRegistry/agentInstances` | Beta | Agent instances tracked in the registry |
+| `GET /agentRegistry/agentCollections` | Beta | Agent collections for grouped management |
+
+**No heuristics needed.** Unlike traditional service principals, agent identities are typed at the API level. EntraLint queries the dedicated agent endpoints directly, eliminating false positives from heuristic classification. The `@odata.type` property and `servicePrincipalType: "ServiceIdentity"` on `agentIdentity` resources provide definitive identification.
+
+### Blocked Permissions
+
+Microsoft globally blocks high-risk Graph API permissions for agents. These permissions cannot be granted to agent identities through Microsoft Graph or the Entra admin center. EntraLint validates that no agent has circumvented these controls.
+
+**Blocked application permissions (❌ = blocked):**
+
+| Permission | Delegated | Application |
+|---|---|---|
+| `Application.ReadWrite.All` | ➖ | ❌ |
+| `AppRoleAssignment.ReadWrite.All` | ➖ | ❌ |
+| `Directory.ReadWrite.All` | ❌ | ❌ |
+| `Directory.Write.Restricted` | ❌ | ❌ |
+| `DelegatedPermissionGrant.ReadWrite.All` | ❌ | ❌ |
+| `Files.Read.All` | ➖ | ❌ |
+| `Files.ReadWrite.All` | ➖ | ❌ |
+| `Group.ReadWrite.All` | ❌ | ❌ |
+| `GroupMember.ReadWrite.All` | ❌ | ❌ |
+| `RoleManagement.ReadWrite.Directory` | ❌ | ❌ |
+| `Sites.FullControl.All` | ➖ | ❌ |
+| `Sites.Read.All` | ➖ | ❌ |
+| `Sites.ReadWrite.All` | ➖ | ❌ |
+| `User.ReadWrite.All` | ❌ | ❌ |
+| `User.DeleteRestore.All` | ❌ | ❌ |
+| `UserAuthenticationMethod.ReadWrite.All` | ❌ | ❌ |
+| `Policy.ReadWrite.CrossTenantAccess` | ➖ | ❌ |
+| `AgentIdentity.Create` / `.Create.All` / `.CreateAsManager` | ➖ | ❌ |
+| `AgentIdentityBlueprint.ReadWrite.All` / `.Create` / `.CreateAsManager` | ➖ | ❌ |
+
+EntraLint check `agent_003` specifically validates that no agent identity holds a permission from the blocked list — catching misconfigurations, legacy grants, or platform bugs.
+
+### Security Check Library (Agent Category)
+
+The agent category adds 12 checks targeting agent-specific risks. These checks operate on the typed `agentIdentity`, `agentIdentityBlueprint`, and `agentIdentityBlueprintPrincipal` resources returned from the GA endpoints.
+
+| Check ID | Severity | Title | What It Detects |
+|---|---|---|---|
+| `agent_001` | Critical | Agent with dangerous permissions | Agent identity holding permissions that should be blocked (e.g., `Files.ReadWrite.All`, `User.ReadWrite.All`) — indicates a platform bypass or legacy grant |
+| `agent_002` | Critical | Agent blueprint with `allAllowedScopes` inheritance | Blueprint whose `inheritablePermissions` use `allAllowedScopes`, allowing agent instances to inherit any permission without explicit enumeration |
+| `agent_003` | High | Agent holding blocked permission | Agent identity granted a permission from Microsoft's globally blocked list — should be impossible but validates platform enforcement |
+| `agent_004` | High | Agent with overly broad permission scope | Agent with 5+ application permissions across multiple resource types |
+| `agent_005` | High | Agent created by non-admin (`createdByAppId` analysis) | Agent identity whose `createdByAppId` resolves to a non-admin application (e.g., Copilot Studio used by non-admin user) |
+| `agent_006` | High | Agent with no owner or sponsor | Agent identity or blueprint with zero owners and zero sponsors — no one accountable for its lifecycle |
+| `agent_007` | Medium | External agent blueprint principal | Blueprint principal with `appOwnerOrganizationId` ≠ your tenant — third-party agent operating in your directory |
+| `agent_008` | Medium | Agent using client secrets instead of federated credentials | Blueprint using `passwordCredentials` instead of `federatedIdentityCredentials` or managed identity |
+| `agent_009` | Medium | Stale agent with valid credentials | Agent identity with no sign-in activity in 90+ days (correlated via `signInLogs`) but `accountEnabled: true` |
+| `agent_010` | Medium | Blueprint with no inheritable permission restrictions | Blueprint whose `inheritablePermissions` is empty or unset, giving no signal about intended permission scope |
+| `agent_011` | Medium | Agent identity disabled by Microsoft | Agent with `disabledByMicrosoftStatus` set to `DisabledDueToViolationOfServicesAgreement` — potential compromise indicator |
+| `agent_012` | Low | Agent without description or documentation | Agent identity or blueprint missing `description` or `info` (marketing/support/terms URLs) — governance gap |
+
+### Check Implementation Examples
+
+**agent_001 — Agent with dangerous permissions:**
+
+```python
+class AgentDangerousPermissions(BaseCheck):
+    """Detect agent identities holding permissions that should be blocked."""
+
+    DANGEROUS_PERMS = {
+        "Files.ReadWrite.All", "Files.Read.All",
+        "Sites.FullControl.All", "Sites.ReadWrite.All", "Sites.Read.All",
+        "User.ReadWrite.All", "User.DeleteRestore.All",
+        "Directory.ReadWrite.All", "Group.ReadWrite.All",
+        "RoleManagement.ReadWrite.Directory",
+        "Application.ReadWrite.All", "AppRoleAssignment.ReadWrite.All",
+    }
+
+    def execute(self, ctx: TenantContext) -> list[Finding]:
+        findings = []
+
+        for agent in ctx.agent_identities:
+            app_role_assignments = ctx.get_agent_app_role_assignments(agent.id)
+            granted = {a.resource_display_name + "/" + a.app_role_id
+                       for a in app_role_assignments}
+            # Resolve role IDs to permission names via resource SP lookup
+            agent_perms = ctx.resolve_app_role_names(app_role_assignments)
+            dangerous = agent_perms & self.DANGEROUS_PERMS
+            if dangerous:
+                findings.append(Finding(
+                    check_id=self.metadata.check_id,
+                    status=Status.FAIL,
+                    severity=Severity.CRITICAL,
+                    resource_type="agentIdentity",
+                    resource_id=agent.id,
+                    title=(
+                        f"Agent '{agent.display_name}' holds "
+                        f"dangerous permissions"
+                    ),
+                    description=(
+                        f"Agent identity (servicePrincipalType: "
+                        f"ServiceIdentity) holds permissions that "
+                        f"Microsoft blocks for new agent grants: "
+                        f"{', '.join(sorted(dangerous))}. This may "
+                        f"indicate a legacy grant or platform bypass."
+                    ),
+                    remediation=(
+                        "Remove the dangerous permissions via "
+                        "DELETE /agentIdentities/{id}/appRoleAssignments"
+                        "/{assignmentId}. Replace with least-privilege "
+                        "scopes appropriate for the agent's function."
+                    ),
+                ))
+
+        if not findings:
+            findings.append(Finding(
+                check_id=self.metadata.check_id,
+                status=Status.PASS,
+                title="No agent identities with dangerous permissions",
+            ))
+        return findings
+```
+
+**agent_006 — Agent with no owner or sponsor:**
+
+```python
+class AgentNoAccountability(BaseCheck):
+    """Detect agent identities with no owners and no sponsors."""
+
+    def execute(self, ctx: TenantContext) -> list[Finding]:
+        findings = []
+
+        for agent in ctx.agent_identities:
+            owners = ctx.get_agent_owners(agent.id)
+            sponsors = ctx.get_agent_sponsors(agent.id)
+            if not owners and not sponsors:
+                findings.append(Finding(
+                    check_id=self.metadata.check_id,
+                    status=Status.FAIL,
+                    severity=Severity.HIGH,
+                    resource_type="agentIdentity",
+                    resource_id=agent.id,
+                    title=(
+                        f"Agent '{agent.display_name}' has no owner "
+                        f"or sponsor"
+                    ),
+                    description=(
+                        f"Agent identity has zero owners and zero "
+                        f"sponsors. The Entra Agent ID platform "
+                        f"requires sponsors during blueprint creation, "
+                        f"but they may have been removed post-creation. "
+                        f"No one is accountable for this agent's "
+                        f"permissions and lifecycle."
+                    ),
+                    remediation=(
+                        "Assign at least one owner and one sponsor to "
+                        "the agent identity via POST /agentIdentities/"
+                        "{id}/owners and POST /agentIdentities/{id}/"
+                        "sponsors."
+                    ),
+                ))
+
+        # Also check blueprints
+        for bp in ctx.agent_identity_blueprints:
+            owners = ctx.get_blueprint_owners(bp.id)
+            sponsors = ctx.get_blueprint_sponsors(bp.id)
+            if not owners and not sponsors:
+                findings.append(Finding(
+                    check_id=self.metadata.check_id,
+                    status=Status.FAIL,
+                    severity=Severity.HIGH,
+                    resource_type="agentIdentityBlueprint",
+                    resource_id=bp.id,
+                    title=(
+                        f"Blueprint '{bp.display_name}' has no owner "
+                        f"or sponsor"
+                    ),
+                    description=(
+                        f"Agent identity blueprint has zero owners and "
+                        f"zero sponsors. All agent identities created "
+                        f"from this blueprint lack accountability."
+                    ),
+                    remediation=(
+                        "Assign at least one sponsor to the blueprint "
+                        "via POST /agentIdentityBlueprints/{id}/sponsors."
+                    ),
+                ))
+
+        if not findings:
+            findings.append(Finding(
+                check_id=self.metadata.check_id,
+                status=Status.PASS,
+                title=(
+                    "All agent identities and blueprints have "
+                    "owners or sponsors"
+                ),
+            ))
+        return findings
+```
+
+### Updated Check Distribution
+
+With the agent category, the total check count increases to 82:
+
+| Category | Critical | High | Medium | Low | Total |
+|----------|----------|------|--------|-----|-------|
+| Conditional Access | 3 | 5 | 3 | 0 | **13** |
+| Authentication | 1 | 1 | 4 | 2 | **8** |
+| Privileged Roles | 4 | 3 | 1 | 0 | **10** |
+| Applications | 3 | 5 | 4 | 0 | **12** |
+| Service Principals | 0 | 5 | 4 | 0 | **9** |
+| Users & Guests | 1 | 2 | 3 | 1 | **7** |
+| Organization | 0 | 2 | 3 | 0 | **5** |
+| Cross-Tenant & B2B | 0 | 2 | 3 | 0 | **5** |
+| **Agentic Identity** | **2** | **4** | **5** | **1** | **12** |
+| **Total** | **14** | **29** | **30** | **4** | **81** |
+
+### Framework Mappings
+
+Agent checks map to existing and emerging compliance frameworks:
+
+| Framework | Relevant Controls | Agent Check Coverage |
+|---|---|---|
+| **CIS Microsoft 365 v5** | 5.1.5.1 (app consent), 5.3.1 (app permissions review) | agent_003, agent_004, agent_005, agent_007 |
+| **CISA SCuBA** | MS.AAD.6.1 (apps with high-priv), MS.AAD.8.1 (guest access) | agent_001, agent_002, agent_010 |
+| **NIST 800-53** | AC-6 (least privilege), AC-17 (remote access), IA-8 (non-org users) | agent_001–agent_011 |
+| **Microsoft Entra Agent ID Governance** | Blueprint sponsor requirements, inheritable permission controls, blocked permission enforcement | agent_002, agent_003, agent_005, agent_006 |
+
+### Data Collection Additions
+
+Agent discovery adds dedicated data collection to the scan pipeline using the GA Agent Identity endpoints:
+
+| Order | Endpoint | Purpose | Dependencies |
+|---|---|---|---|
+| 16 | `GET /agentIdentityBlueprints` | All agent blueprints (templates) | None |
+| 17 | `GET /agentIdentityBlueprintPrincipals` | All blueprint principals in the tenant | None |
+| 18 | `GET /agentIdentities` | All agent identity instances | None |
+| 19 | `GET /agentIdentityBlueprints/{id}/inheritablePermissions` (per blueprint) | Inheritable permission configuration | Order 16 |
+| 20 | `GET /agentIdentities/{id}/appRoleAssignments` (per agent) | Application permissions per agent | Order 18 |
+| 21 | `GET /agentIdentities/{id}/owners` + `/sponsors` (per agent) | Accountability metadata | Order 18 |
+| 22 | `GET /agentIdentityBlueprintPrincipals/{id}/owners` + `/sponsors` (per BP principal) | Blueprint accountability | Order 17 |
+
+All agent data is stored in `TenantContext.agent_identities`, `TenantContext.agent_identity_blueprints`, and `TenantContext.agent_identity_blueprint_principals` for downstream checks to consume. The data is fetched in parallel where possible (Orders 16–18 have no dependencies on each other).
+
+**Required permissions:** `AgentIdentity.Read.All` (application) to read agent identities, blueprints, and blueprint principals. This is a read-only permission and does not grant the ability to create or modify agent identities.
+
+### Limitations and Future Roadmap
+
+**Current limitations:**
+
+- **Agent registry (beta).** The `agentRegistry` endpoints (agent card manifests, instances, collections) are in beta and may change. EntraLint uses only GA v1.0 endpoints for agent identity checks. Agent registry data will be integrated when the endpoints reach GA.
+- **Delegation chain visibility.** Agent-to-agent calls (A calls B with on-behalf-of tokens) are not visible via Graph API configuration data. Detecting these requires runtime audit log analysis, which is out of scope for the current static configuration scanner.
+- **Identity Protection signals.** The `agentRiskDetection` and `riskyAgent` resource types (beta) provide runtime risk signals for agents. EntraLint will integrate these when they reach GA to flag agents with active risk detections.
+- **Copilot Studio internals.** Power Platform environment-level agent policies (DLP, connector restrictions) are not accessible via Microsoft Graph. EntraLint scans what's visible at the Entra ID layer; Power Platform governance is a separate concern.
+
+**Planned roadmap:**
+
+| Phase | Scope |
+|---|---|
+| **v0.2** (initial) | Ship agent_001–agent_006 using GA Agent Identity APIs (`/agentIdentities`, `/agentIdentityBlueprints`) |
+| **v0.3** | Add agent_007–agent_012, integrate `agentRegistry` beta endpoints for card manifest analysis |
+| **v0.4** | Audit log correlation — detect agent sign-in patterns from `signInLogs` filtered by `servicePrincipalType eq 'ServiceIdentity'`, integrate `riskyAgent` and `agentRiskDetection` signals |
+| **v1.0** | Full agent governance: Conditional Access policy validation for agents, inheritable permission drift detection, sponsor lifecycle compliance |
 
 ---
 

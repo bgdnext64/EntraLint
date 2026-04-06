@@ -26,10 +26,14 @@ from entralint.core.config import load_config_auto
 from entralint.core.context import TenantContext
 from entralint.core.engine import CheckEngine
 from entralint.core.models import (
+    AgentIdentity,
+    AgentIdentityBlueprint,
+    AgentIdentityBlueprintPrincipal,
     Application,
     AppRoleAssignment,
     ConditionalAccessPolicy,
     DirectoryRoleAssignment,
+    InheritablePermission,
     ServicePrincipal,
     User,
 )
@@ -246,6 +250,115 @@ async def _fetch_and_scan(
             except Exception as exc:
                 _fail("Named locations", str(exc))
 
+            # --- Agent Identity Blueprints ---
+            agent_blueprints: list[AgentIdentityBlueprint] = []
+            try:
+                raw_bps = await graph.get_all_pages(
+                    "/agentIdentityBlueprints"
+                )
+                for bp_raw in raw_bps:
+                    bp = AgentIdentityBlueprint.model_validate(bp_raw)
+                    # Fetch owners, sponsors, inheritable permissions
+                    with contextlib.suppress(Exception):
+                        owners_resp = await graph.get(
+                            f"/agentIdentityBlueprints/{bp.id}/owners"
+                        )
+                        bp.owners = owners_resp.get("value", [])
+                    with contextlib.suppress(Exception):
+                        sponsors_resp = await graph.get(
+                            f"/agentIdentityBlueprints/{bp.id}/sponsors"
+                        )
+                        bp.sponsors = sponsors_resp.get("value", [])
+                    with contextlib.suppress(Exception):
+                        ip_resp = await graph.get(
+                            f"/agentIdentityBlueprints/{bp.id}"
+                            "/inheritablePermissions"
+                        )
+                        bp.inheritable_permissions = [
+                            InheritablePermission.model_validate(ip)
+                            for ip in ip_resp.get("value", [])
+                        ]
+                    agent_blueprints.append(bp)
+                granted_permissions.add("AgentIdentity.Read.All")
+                _ok(
+                    "Agent identity blueprints",
+                    f"{len(agent_blueprints)} blueprints",
+                )
+            except Exception as exc:
+                _fail("Agent identity blueprints", str(exc))
+
+            # --- Agent Identity Blueprint Principals ---
+            agent_bp_principals: list[AgentIdentityBlueprintPrincipal] = []
+            try:
+                raw_bpps = await graph.get_all_pages(
+                    "/agentIdentityBlueprintPrincipals"
+                )
+                for bpp_raw in raw_bpps:
+                    bpp = AgentIdentityBlueprintPrincipal.model_validate(
+                        bpp_raw
+                    )
+                    with contextlib.suppress(Exception):
+                        owners_resp = await graph.get(
+                            f"/agentIdentityBlueprintPrincipals"
+                            f"/{bpp.id}/owners"
+                        )
+                        bpp.owners = owners_resp.get("value", [])
+                    with contextlib.suppress(Exception):
+                        sponsors_resp = await graph.get(
+                            f"/agentIdentityBlueprintPrincipals"
+                            f"/{bpp.id}/sponsors"
+                        )
+                        bpp.sponsors = sponsors_resp.get("value", [])
+                    agent_bp_principals.append(bpp)
+                _ok(
+                    "Agent blueprint principals",
+                    f"{len(agent_bp_principals)} principals",
+                )
+            except Exception as exc:
+                _fail("Agent blueprint principals", str(exc))
+
+            # --- Agent Identities ---
+            agent_identities: list[AgentIdentity] = []
+            try:
+                raw_agents = await graph.get_all_pages(
+                    "/agentIdentities"
+                )
+                for ag_raw in raw_agents:
+                    ag = AgentIdentity.model_validate(ag_raw)
+                    with contextlib.suppress(Exception):
+                        owners_resp = await graph.get(
+                            f"/agentIdentities/{ag.id}/owners"
+                        )
+                        ag.owners = owners_resp.get("value", [])
+                    with contextlib.suppress(Exception):
+                        sponsors_resp = await graph.get(
+                            f"/agentIdentities/{ag.id}/sponsors"
+                        )
+                        ag.sponsors = sponsors_resp.get("value", [])
+                    with contextlib.suppress(Exception):
+                        ara_resp = await graph.get(
+                            f"/agentIdentities/{ag.id}/appRoleAssignments"
+                        )
+                        ag.app_role_assignments = [
+                            AppRoleAssignment.model_validate(a)
+                            for a in ara_resp.get("value", [])
+                        ]
+                    with contextlib.suppress(Exception):
+                        grants_resp = await graph.get(
+                            f"/agentIdentities/{ag.id}"
+                            "/oauth2PermissionGrants"
+                        )
+                        ag.oauth2_permission_grants = grants_resp.get(
+                            "value", []
+                        )
+                    agent_identities.append(ag)
+                _ok(
+                    "Agent identities",
+                    f"{len(agent_identities)} agents",
+                )
+            except Exception as exc:
+                _fail("Agent identities", str(exc))
+
         # --- Display fetch results as a compact table ---
         if not quiet:
             tbl = Table(
@@ -273,6 +386,9 @@ async def _fetch_and_scan(
             authentication_methods_policy=auth_methods_policy,
             authorization_policy=authorization_policy,
             cross_tenant_access_policy=cross_tenant_policy,
+            agent_identities=agent_identities,
+            agent_identity_blueprints=agent_blueprints,
+            agent_identity_blueprint_principals=agent_bp_principals,
             granted_permissions=granted_permissions,
         )
 

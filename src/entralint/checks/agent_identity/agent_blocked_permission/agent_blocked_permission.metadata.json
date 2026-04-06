@@ -1,0 +1,23 @@
+{
+    "CheckID": "entraid_agent_003",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure no agent identity holds a blocked permission",
+    "ServiceName": "AgentIdentity",
+    "Severity": "HIGH",
+    "ResourceType": "AgentIdentity",
+    "Description": "Validates that no agent identity has been granted a permission from Microsoft's globally blocked list. These permissions should be unassignable to agents at the platform level, so any grant indicates a bypass or legacy condition.",
+    "Risk": "Blocked permissions exist because they are too dangerous for autonomous agents — including Directory.ReadWrite.All, RoleManagement.ReadWrite.Directory, and Application.ReadWrite.All. An agent holding these can escalate privileges or modify tenant-critical configuration.",
+    "Remediation": {
+        "Recommendation": "Remove the blocked permission grant immediately. Investigate how the permission was assigned — it may indicate a platform bug or policy circumvention.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/agentid-platform-overview#microsoft-graph-permissions-blocked-for-agents"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["AC-6", "AC-3"], "verified": false, "source": "AI-generated mapping"},
+        {"framework": "CISA_SCuBA", "controls": ["MS.AAD.6.1"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/agentIdentities", "/agentIdentities/{id}/appRoleAssignments"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Blocked permission list sourced from Microsoft Entra Agent ID documentation."
+}

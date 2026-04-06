@@ -204,3 +204,122 @@ class Organization(BaseModel):
     )
 
     model_config = {"populate_by_name": True}
+
+
+# ---------------------------------------------------------------------------
+# Agent Identity models (Microsoft Entra Agent ID — GA v1.0, March 2026)
+# ---------------------------------------------------------------------------
+
+
+class InheritablePermission(BaseModel):
+    """Defines scopes a blueprint allows agent instances to inherit."""
+
+    id: str = ""
+    scope_collection_kind: str = Field(
+        default="", alias="scopeCollectionKind"
+    )
+    # For enumeratedScopes, the specific scope values
+    scopes: list[str] = Field(default_factory=list)
+    resource_app_id: str = Field(default="", alias="resourceAppId")
+
+    model_config = {"populate_by_name": True}
+
+
+class AgentIdentityBlueprint(BaseModel):
+    """Template defining an agent identity type (inherits application)."""
+
+    id: str = ""
+    app_id: str = Field(default="", alias="appId")
+    display_name: str = Field(default="", alias="displayName")
+    description: str | None = Field(default=None)
+    sign_in_audience: str = Field(default="", alias="signInAudience")
+    created_date_time: str | None = Field(
+        default=None, alias="createdDateTime"
+    )
+    created_by_app_id: str | None = Field(
+        default=None, alias="createdByAppId"
+    )
+    disabled_by_microsoft_status: str | None = Field(
+        default=None, alias="disabledByMicrosoftStatus"
+    )
+    tags: list[str] = Field(default_factory=list)
+    password_credentials: list[PasswordCredential] = Field(
+        default_factory=list, alias="passwordCredentials"
+    )
+    key_credentials: list[KeyCredential] = Field(
+        default_factory=list, alias="keyCredentials"
+    )
+    info: dict[str, Any] | None = None
+    required_resource_access: list[RequiredResourceAccess] = Field(
+        default_factory=list, alias="requiredResourceAccess"
+    )
+    # Populated via $expand or separate call
+    owners: list[dict[str, Any]] = Field(default_factory=list)
+    sponsors: list[dict[str, Any]] = Field(default_factory=list)
+    inheritable_permissions: list[InheritablePermission] = Field(
+        default_factory=list, alias="inheritablePermissions"
+    )
+    federated_identity_credentials: list[dict[str, Any]] = Field(
+        default_factory=list, alias="federatedIdentityCredentials"
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class AgentIdentityBlueprintPrincipal(BaseModel):
+    """Tenant-specific instance of a blueprint (inherits servicePrincipal)."""
+
+    id: str = ""
+    app_id: str = Field(default="", alias="appId")
+    display_name: str = Field(default="", alias="displayName")
+    app_display_name: str = Field(default="", alias="appDisplayName")
+    app_owner_organization_id: str | None = Field(
+        default=None, alias="appOwnerOrganizationId"
+    )
+    account_enabled: bool = Field(default=True, alias="accountEnabled")
+    service_principal_type: str = Field(
+        default="", alias="servicePrincipalType"
+    )
+    tags: list[str] = Field(default_factory=list)
+    owners: list[dict[str, Any]] = Field(default_factory=list)
+    sponsors: list[dict[str, Any]] = Field(default_factory=list)
+    app_role_assignments: list[AppRoleAssignment] = Field(
+        default_factory=list, alias="appRoleAssignments"
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class AgentIdentity(BaseModel):
+    """Individual agent instance (inherits servicePrincipal)."""
+
+    id: str = ""
+    display_name: str = Field(default="", alias="displayName")
+    app_id: str | None = Field(default=None, alias="appId")
+    agent_identity_blueprint_id: str | None = Field(
+        default=None, alias="agentIdentityBlueprintId"
+    )
+    account_enabled: bool = Field(default=True, alias="accountEnabled")
+    service_principal_type: str = Field(
+        default="ServiceIdentity", alias="servicePrincipalType"
+    )
+    created_by_app_id: str | None = Field(
+        default=None, alias="createdByAppId"
+    )
+    created_date_time: str | None = Field(
+        default=None, alias="createdDateTime"
+    )
+    disabled_by_microsoft_status: str | None = Field(
+        default=None, alias="disabledByMicrosoftStatus"
+    )
+    tags: list[str] = Field(default_factory=list)
+    owners: list[dict[str, Any]] = Field(default_factory=list)
+    sponsors: list[dict[str, Any]] = Field(default_factory=list)
+    app_role_assignments: list[AppRoleAssignment] = Field(
+        default_factory=list, alias="appRoleAssignments"
+    )
+    oauth2_permission_grants: list[dict[str, Any]] = Field(
+        default_factory=list, alias="oauth2PermissionGrants"
+    )
+
+    model_config = {"populate_by_name": True}

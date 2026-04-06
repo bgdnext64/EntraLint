@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_agent_012",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure agent identities and blueprints have descriptions",
+    "ServiceName": "AgentIdentity",
+    "Severity": "LOW",
+    "ResourceType": "AgentIdentity",
+    "Description": "Checks that agent identities and blueprints have a description or informational URL set. Missing metadata makes governance review and incident response harder.",
+    "Risk": "Agent identities without descriptions or documentation create a governance gap. During incident response, responders cannot quickly determine the agent's purpose, owner, or intended scope.",
+    "Remediation": {
+        "Recommendation": "Add a description to the agent identity or blueprint via PATCH. Include the agent's purpose, intended scope, and contact information in the info property.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["CM-8"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/agentIdentities", "/agentIdentityBlueprints"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Description and info properties are inherited from application/servicePrincipal."
+}
