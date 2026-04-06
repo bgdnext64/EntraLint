@@ -254,24 +254,24 @@ async def _fetch_and_scan(
             agent_blueprints: list[AgentIdentityBlueprint] = []
             try:
                 raw_bps = await graph.get_all_pages(
-                    "/agentIdentityBlueprints"
+                    "/applications/microsoft.graph.agentIdentityBlueprint"
                 )
                 for bp_raw in raw_bps:
                     bp = AgentIdentityBlueprint.model_validate(bp_raw)
                     # Fetch owners, sponsors, inheritable permissions
                     with contextlib.suppress(Exception):
                         owners_resp = await graph.get(
-                            f"/agentIdentityBlueprints/{bp.id}/owners"
+                            f"/applications/{bp.id}/owners"
                         )
                         bp.owners = owners_resp.get("value", [])
                     with contextlib.suppress(Exception):
                         sponsors_resp = await graph.get(
-                            f"/agentIdentityBlueprints/{bp.id}/sponsors"
+                            f"/applications/{bp.id}/sponsors"
                         )
                         bp.sponsors = sponsors_resp.get("value", [])
                     with contextlib.suppress(Exception):
                         ip_resp = await graph.get(
-                            f"/agentIdentityBlueprints/{bp.id}"
+                            f"/applications/{bp.id}"
                             "/inheritablePermissions"
                         )
                         bp.inheritable_permissions = [
@@ -291,7 +291,8 @@ async def _fetch_and_scan(
             agent_bp_principals: list[AgentIdentityBlueprintPrincipal] = []
             try:
                 raw_bpps = await graph.get_all_pages(
-                    "/agentIdentityBlueprintPrincipals"
+                    "/servicePrincipals/microsoft.graph"
+                    ".agentIdentityBlueprintPrincipal"
                 )
                 for bpp_raw in raw_bpps:
                     bpp = AgentIdentityBlueprintPrincipal.model_validate(
@@ -299,14 +300,12 @@ async def _fetch_and_scan(
                     )
                     with contextlib.suppress(Exception):
                         owners_resp = await graph.get(
-                            f"/agentIdentityBlueprintPrincipals"
-                            f"/{bpp.id}/owners"
+                            f"/servicePrincipals/{bpp.id}/owners"
                         )
                         bpp.owners = owners_resp.get("value", [])
                     with contextlib.suppress(Exception):
                         sponsors_resp = await graph.get(
-                            f"/agentIdentityBlueprintPrincipals"
-                            f"/{bpp.id}/sponsors"
+                            f"/servicePrincipals/{bpp.id}/sponsors"
                         )
                         bpp.sponsors = sponsors_resp.get("value", [])
                     agent_bp_principals.append(bpp)
@@ -321,23 +320,25 @@ async def _fetch_and_scan(
             agent_identities: list[AgentIdentity] = []
             try:
                 raw_agents = await graph.get_all_pages(
-                    "/agentIdentities"
+                    "/servicePrincipals/microsoft.graph"
+                    ".agentIdentity"
                 )
                 for ag_raw in raw_agents:
                     ag = AgentIdentity.model_validate(ag_raw)
                     with contextlib.suppress(Exception):
                         owners_resp = await graph.get(
-                            f"/agentIdentities/{ag.id}/owners"
+                            f"/servicePrincipals/{ag.id}/owners"
                         )
                         ag.owners = owners_resp.get("value", [])
                     with contextlib.suppress(Exception):
                         sponsors_resp = await graph.get(
-                            f"/agentIdentities/{ag.id}/sponsors"
+                            f"/servicePrincipals/{ag.id}/sponsors"
                         )
                         ag.sponsors = sponsors_resp.get("value", [])
                     with contextlib.suppress(Exception):
                         ara_resp = await graph.get(
-                            f"/agentIdentities/{ag.id}/appRoleAssignments"
+                            f"/servicePrincipals/{ag.id}"
+                            "/appRoleAssignments"
                         )
                         ag.app_role_assignments = [
                             AppRoleAssignment.model_validate(a)
@@ -345,7 +346,7 @@ async def _fetch_and_scan(
                         ]
                     with contextlib.suppress(Exception):
                         grants_resp = await graph.get(
-                            f"/agentIdentities/{ag.id}"
+                            f"/servicePrincipals/{ag.id}"
                             "/oauth2PermissionGrants"
                         )
                         ag.oauth2_permission_grants = grants_resp.get(
