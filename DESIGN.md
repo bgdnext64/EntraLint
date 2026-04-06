@@ -24,6 +24,7 @@
 14. [Report Generation Formats](#report-generation-formats)
 15. [Extensibility and Plugin System](#extensibility-and-plugin-system)
 16. [Agentic Identity Security](#agentic-identity-security)
+    - [Detailed Check Reference](#detailed-check-reference)
 17. [GitHub Repository Structure](#github-repository-structure)
 18. [Testing Strategy](#testing-strategy)
 
@@ -1027,6 +1028,302 @@ The agent category adds 12 checks targeting agent-specific risks. These checks o
 | `agent_010` | Medium | Blueprint with no inheritable permission restrictions | Blueprint whose `inheritablePermissions` is empty or unset, giving no signal about intended permission scope |
 | `agent_011` | Medium | Agent identity disabled by Microsoft | Agent with `disabledByMicrosoftStatus` set to `DisabledDueToViolationOfServicesAgreement` — potential compromise indicator |
 | `agent_012` | Low | Agent without description or documentation | Agent identity or blueprint missing `description` or `info` (marketing/support/terms URLs) — governance gap |
+
+### Detailed Check Reference
+
+#### `entraid_agent_001` — Ensure agent identities do not hold dangerous permissions
+
+| | |
+|---|---|
+| **Severity** | Critical |
+| **Resource Type** | `AgentIdentity` |
+| **Required Permission** | `AgentIdentity.Read.All` |
+| **Graph Endpoints** | `GET /servicePrincipals/microsoft.graph.agentIdentity`, `GET /servicePrincipals/{id}/appRoleAssignments` |
+| **Frameworks** | CIS M365 v5 (5.3.5), CISA SCuBA (MS.AAD.6.1), NIST 800-53 (AC-6) |
+
+**What it detects:** Agent identities that have been granted high-risk application permissions such as `Files.ReadWrite.All`, `User.ReadWrite.All`, or `Directory.ReadWrite.All`. These permissions are on Microsoft's blocked list for new agent grants, so their presence indicates either a legacy grant that predates enforcement, a platform bypass, or a misconfiguration.
+
+**Detection logic:** The check maintains a `DANGEROUS_ROLE_IDS` dictionary mapping 14 well-known Microsoft Graph app role GUIDs to their permission names. For each agent identity, it iterates over `appRoleAssignments` and flags any whose `appRoleId` matches a dangerous GUID. Each matching assignment produces a separate finding identifying the specific permission.
+
+**Dangerous permissions checked (14):**
+
+- `Files.ReadWrite.All`, `Files.Read.All`
+- `Sites.FullControl.All`, `Sites.ReadWrite.All`, `Sites.Read.All`
+- `User.ReadWrite.All`, `User.DeleteRestore.All`
+- `Directory.ReadWrite.All`, `Directory.Write.Restricted`
+- `Group.ReadWrite.All`, `GroupMember.ReadWrite.All`
+- `RoleManagement.ReadWrite.Directory`
+- `Application.ReadWrite.All`, `AppRoleAssignment.ReadWrite.All`
+
+**Risk:** An agent with these permissions can read or modify sensitive data across the entire tenant — user profiles, files, site content, directory objects, or role assignments. A compromised agent token with `RoleManagement.ReadWrite.Directory` grants full privilege escalation.
+
+**Remediation:** Remove the dangerous permission via `DELETE /servicePrincipals/{id}/appRoleAssignments/{assignmentId}`. Replace with least-privilege scopes appropriate for the agent's function. For file access, consider `Files.Read` (delegated, user-scoped) instead of `Files.ReadWrite.All` (application-wide).
+
+---
+
+#### `entraid_agent_002` — Ensure agent blueprints do not use `allAllowedScopes` inheritance
+
+| | |
+|---|---|
+| **Severity** | Critical |
+| **Resource Type** | `AgentIdentityBlueprint` |
+| **Required Permission** | `AgentIdentity.Read.All` |
+| **Graph Endpoints** | `GET /applications/microsoft.graph.agentIdentityBlueprint`, `GET /applications/{id}/inheritablePermissions` |
+| **Frameworks** | CIS M365 v5 (5.1.5.1), NIST 800-53 (AC-6) |
+
+**What it detects:** Agent identity blueprints whose `inheritablePermissions` are configured with `scopeCollectionKind: "allAllowedScopes"`. This setting allows any agent instance created from the blueprint to inherit every permission the blueprint can access, without requiring explicit enumeration of allowed scopes.
+
+**Detection logic:** For each blueprint, iterates the `inheritable_permissions` list. If any `InheritablePermission` object has `scope_collection_kind == "allAllowedScopes"`, the check emits a FAIL finding for that blueprint and breaks (one finding per blueprint, even if multiple inheritable permission entries use `allAllowedScopes`).
+
+**Risk:** `allAllowedScopes` defeats the purpose of the inheritable permissions model. The entire point of `inheritablePermissions` is to restrict which scopes agent instances can pick up from their blueprint — using `allAllowedScopes` makes this restriction vacuous. Any admin granting permissions to the blueprint effectively grants them to every current and future agent instance.
+
+**Remediation:** Update the blueprint's `inheritablePermissions` to use `enumeratedScopes` with an explicit list of allowed scope GUIDs, or `noScopes` if agent instances should not inherit any permissions from the blueprint. Use `PATCH /applications/{blueprintId}` with the updated `inheritablePermissions` collection.
+
+---
+
+#### `entraid_agent_003` — Ensure no agent identity holds a blocked permission
+
+| | |
+|---|---|
+| **Severity** | High |
+| **Resource Type** | `AgentIdentity` |
+| **Required Permission** | `AgentIdentity.Read.All` |
+| **Graph Endpoints** | `GET /servicePrincipals/microsoft.graph.agentIdentity`, `GET /servicePrincipals/{id}/appRoleAssignments` |
+| **Frameworks** | NIST 800-53 (AC-6, AC-3), CISA SCuBA (MS.AAD.6.1) |
+
+**What it detects:** Agent identities holding any permission from Microsoft's official blocked permissions list. While Microsoft's platform enforcement should prevent these grants, this check validates that enforcement is actually working. A match indicates a legacy grant from before enforcement was activated, a platform bug, or a policy circumvention.
+
+**Detection logic:** Maintains a `BLOCKED_APP_ROLE_IDS` dictionary with 19 well-known GUIDs — a superset of the dangerous permissions in `agent_001`. For each agent, iterates `appRoleAssignments` and flags matches. Each match produces an individual finding.
+
+**Blocked permissions checked (19):** All 14 from `agent_001` plus:
+
+- `DelegatedPermissionGrant.ReadWrite.All`
+- `Application.ReadWrite.OwnedBy`
+- `User.EnableDisableAccount.All`
+- `UserAuthenticationMethod.ReadWrite.All`
+- `Policy.ReadWrite.CrossTenantAccess`
+
+**Overlap with `agent_001`:** An agent holding `Files.ReadWrite.All` will trigger both `agent_001` (Critical) and `agent_003` (High). This is intentional — `agent_001` focuses on immediate risk severity, while `agent_003` validates platform enforcement. In practice, any `agent_001` finding is also an `agent_003` finding, but `agent_003` casts a wider net.
+
+**Risk:** Blocked permissions enable privilege escalation or tenant-critical changes. `DelegatedPermissionGrant.ReadWrite.All` allows an agent to consent to arbitrary permissions on behalf of users. `UserAuthenticationMethod.ReadWrite.All` allows resetting MFA methods.
+
+**Remediation:** Remove the blocked permission immediately via `DELETE /servicePrincipals/{id}/appRoleAssignments/{assignmentId}`. Investigate how it was assigned — audit `directoryAudits` for the grant event to determine if it was a legacy migration, admin action, or automated process.
+
+---
+
+#### `entraid_agent_004` — Ensure agent identities do not have overly broad permission scope
+
+| | |
+|---|---|
+| **Severity** | High |
+| **Resource Type** | `AgentIdentity` |
+| **Required Permission** | `AgentIdentity.Read.All` |
+| **Graph Endpoints** | `GET /servicePrincipals/microsoft.graph.agentIdentity`, `GET /servicePrincipals/{id}/appRoleAssignments` |
+| **Frameworks** | CIS M365 v5 (5.3.1), NIST 800-53 (AC-6) |
+
+**What it detects:** Agent identities with 5 or more application permission grants (`appRoleAssignments`). A high number of app role assignments indicates the agent accesses multiple resource types (Mail, Files, Users, Groups, etc.), creating a large blast radius.
+
+**Detection logic:** Constant `MAX_APP_ROLE_ASSIGNMENTS = 4`. For each agent, if `len(agent.app_role_assignments) > MAX_APP_ROLE_ASSIGNMENTS`, emit a FAIL finding that includes the count.
+
+**Threshold rationale:** Most well-designed agents need 1–3 permissions (e.g., `Mail.Read` + `Calendars.Read` for a scheduling agent). An agent with 5+ permissions typically indicates either scope creep (dev added permissions during debugging and never removed them) or a multi-purpose agent that should be decomposed into single-purpose identities.
+
+**Risk:** A compromised agent token with many permissions grants the attacker a wide attack surface. Five permissions across Mail, Files, Users, Groups, and Calendar is sufficient to exfiltrate most organizational data.
+
+**Remediation:** Review and remove non-essential permissions. Consider splitting into multiple single-purpose agents, each with minimal permissions for its function. Use `GET /servicePrincipals/{id}/appRoleAssignments` to audit the full list.
+
+---
+
+#### `entraid_agent_005` — Ensure agent identities are created by authorized applications
+
+| | |
+|---|---|
+| **Severity** | High |
+| **Resource Type** | `AgentIdentity` |
+| **Required Permission** | `AgentIdentity.Read.All` |
+| **Graph Endpoints** | `GET /servicePrincipals/microsoft.graph.agentIdentity` |
+| **Frameworks** | CIS M365 v5 (5.1.5.1), NIST 800-53 (CM-3) |
+
+**What it detects:** Agent identities whose `createdByAppId` resolves to an application that is not registered in the tenant. This indicates the agent was created by an external tool (e.g., the Microsoft Graph PowerShell SDK, Graph Explorer, or a third-party platform) rather than a tenant-managed application.
+
+**Detection logic:** Builds a set of `known_app_ids` from `context.applications` (all app registrations in the tenant). For each agent, if `created_by_app_id` is set and does not appear in `known_app_ids`, emit a FAIL finding identifying the external app ID.
+
+**Why this matters:** The `createdByAppId` property records which application called `POST /servicePrincipals/microsoft.graph.agentIdentity` to create the agent. If that application isn't in your tenant's app registrations, you have limited visibility into who created it and why. This is particularly relevant for:
+
+- Agents created via Graph Explorer or SDK during ad-hoc testing
+- Agents created by Copilot Studio (which uses Microsoft's own app registration)
+- Agents created by third-party agent platforms operating under their own app ID
+
+**Risk:** Agents created by unauthorized applications bypass admin governance review. Without knowing which application created an agent, you cannot enforce app management policies, audit the creation workflow, or attribute the agent to a responsible team.
+
+**Remediation:** Verify the creating application is approved. Map the `createdByAppId` to a specific application using `GET /servicePrincipals?$filter=appId eq '{createdByAppId}'`. Restrict agent creation to authorized applications via Entra ID app management policies.
+
+---
+
+#### `entraid_agent_006` — Ensure all agent identities and blueprints have owners or sponsors
+
+| | |
+|---|---|
+| **Severity** | High |
+| **Resource Type** | `AgentIdentity`, `AgentIdentityBlueprint` |
+| **Required Permission** | `AgentIdentity.Read.All` |
+| **Graph Endpoints** | `GET /servicePrincipals/{id}/owners`, `GET /servicePrincipals/{id}/sponsors`, `GET /applications/{id}/owners`, `GET /applications/{id}/sponsors` |
+| **Frameworks** | CIS M365 v5 (5.3.1), NIST 800-53 (AC-6(5)) |
+
+**What it detects:** Agent identities and blueprints that have zero owners **and** zero sponsors. The Entra Agent ID platform requires sponsors during blueprint creation, but they can be removed post-creation, leaving the agent orphaned.
+
+**Detection logic:** Two loops — one over `context.agent_identities`, one over `context.agent_identity_blueprints`. For each resource, if both `owners` and `sponsors` are empty lists, emit a FAIL. Produces separate findings for agents and blueprints, each identifying the specific resource.
+
+**Why sponsors matter:** Sponsors are a new concept introduced by the Agent ID platform. Unlike owners (who have management access), sponsors authorize the agent's lifecycle — they are the business justification for the agent's existence. An agent with no owners and no sponsors has no accountable party for:
+
+- Permission reviews (who approves new permission requests?)
+- Credential rotation (who rotates secrets/certificates?)
+- Incident response (who is contacted when the agent behaves anomalously?)
+- Decommissioning (who decides when the agent is no longer needed?)
+
+**Risk:** Orphaned agents accumulate permissions and credentials without review, becoming attractive targets for credential abuse.
+
+**Remediation:** Assign at least one owner and one sponsor. For agents: `POST /servicePrincipals/{id}/owners/$ref` and `POST /servicePrincipals/{id}/sponsors/$ref`. For blueprints: `POST /applications/{id}/sponsors/$ref`.
+
+---
+
+#### `entraid_agent_007` — Review external agent blueprint principals
+
+| | |
+|---|---|
+| **Severity** | Medium |
+| **Resource Type** | `AgentIdentityBlueprintPrincipal` |
+| **Required Permission** | `AgentIdentity.Read.All` |
+| **Graph Endpoints** | `GET /servicePrincipals/microsoft.graph.agentIdentityBlueprintPrincipal` |
+| **Frameworks** | NIST 800-53 (IA-8), CISA SCuBA (MS.AAD.8.1) |
+
+**What it detects:** Agent blueprint principals where `appOwnerOrganizationId` differs from the current tenant ID. These represent agent blueprints published by external organizations (ISVs, partners, or Microsoft itself) that have been instantiated in your tenant.
+
+**Detection logic:** For each blueprint principal, compares `bpp.app_owner_organization_id` against `context.tenant_id`. If both are set and they differ, emit a FAIL finding identifying the external organization ID and the blueprint name.
+
+**Why this matters:** External blueprints operate with permissions granted in your tenant but are managed by an external organization. You cannot control the blueprint's code, update schedule, or security posture — you can only control the permissions you grant to it. This is analogous to third-party enterprise apps, but with the added risk that agents may operate autonomously.
+
+**Risk:** External agents with broad permissions have limited visibility. You cannot audit the agent's internal behavior, only its Graph API calls. A compromised publisher could push malicious updates to the blueprint that affect all tenants using it.
+
+**Remediation:** Review the external agent's publisher, permissions, and data access scope. Validate verified publisher status via the `verifiedPublisher` property. Remove or restrict untrusted agents. Consider using Conditional Access policies to limit external agent access.
+
+---
+
+#### `entraid_agent_008` — Ensure agent blueprints use federated credentials instead of client secrets
+
+| | |
+|---|---|
+| **Severity** | Medium |
+| **Resource Type** | `AgentIdentityBlueprint` |
+| **Required Permission** | `AgentIdentity.Read.All` |
+| **Graph Endpoints** | `GET /applications/microsoft.graph.agentIdentityBlueprint` |
+| **Frameworks** | CIS M365 v5 (5.3.4), NIST 800-53 (IA-5) |
+
+**What it detects:** Agent identity blueprints that use `passwordCredentials` (client secrets) for authentication without any `federatedIdentityCredentials` configured. Client secrets are shared secrets that can be leaked in code, logs, configuration files, or environment variables.
+
+**Detection logic:** For each blueprint, if `len(bp.password_credentials) > 0` **and** `len(bp.federated_identity_credentials) == 0`, emit a FAIL. This means blueprints using both secrets and federated credentials pass — the check specifically flags secrets-only configurations.
+
+**Why federated credentials are preferred:** Workload identity federation (federated identity credentials) eliminates shared secrets entirely. The agent authenticates using a token from an external identity provider (e.g., GitHub Actions OIDC, Azure Kubernetes Service, or another Entra ID tenant) that is exchanged for an Entra ID access token. No secret is ever stored or transmitted.
+
+**Risk:** Client secrets can be exfiltrated through source code repositories, CI/CD logs, environment variable dumps, or insider access. Once leaked, the secret provides persistent access until rotated. Federated credentials eliminate this entire attack class.
+
+**Remediation:** Replace client secrets with federated identity credentials or certificate-based key credentials. Remove the password credential via `POST /applications/{id}/removePassword`. Configure workload identity federation via `POST /applications/{id}/federatedIdentityCredentials`.
+
+---
+
+#### `entraid_agent_009` — Ensure stale agent identities are disabled or removed
+
+| | |
+|---|---|
+| **Severity** | Medium |
+| **Resource Type** | `AgentIdentity` |
+| **Required Permission** | `AgentIdentity.Read.All` |
+| **Graph Endpoints** | `GET /servicePrincipals/microsoft.graph.agentIdentity` |
+| **Frameworks** | CIS M365 v5 (5.3.1), NIST 800-53 (AC-2(3)) |
+
+**What it detects:** Enabled agent identities that were created more than 90 days ago but are still `accountEnabled: true`. These may be test agents, deprecated agents, or abandoned proof-of-concept identities that retain active permissions and credentials.
+
+**Detection logic:** Constant `STALE_DAYS = 90`. For each agent, skips those that are disabled (`account_enabled == False`) or have no `created_date_time`. Parses the creation date and calculates age in days. If `age > 90` and `account_enabled == True`, emit a FAIL with the age.
+
+**Limitation:** This check uses creation date as a proxy for activity because the `lastSignInDateTime` property is not currently available on the `agentIdentity` resource type. Future versions will correlate with `signInLogs` filtered by `servicePrincipalType eq 'ServiceIdentity'` for true last-activity detection.
+
+**Risk:** Stale agents retain their permissions and credentials indefinitely. An attacker who discovers a forgotten agent's credentials gains persistent access to whatever permissions were granted — potentially months or years after the agent was last used.
+
+**Remediation:** Disable or delete unused agent identities. Review sign-in logs (`GET /auditLogs/signIns?$filter=servicePrincipalId eq '{id}'`) to confirm inactivity before deletion. Use `PATCH /servicePrincipals/{id}` with `{"accountEnabled": false}` to disable.
+
+---
+
+#### `entraid_agent_010` — Ensure agent blueprints define inheritable permission restrictions
+
+| | |
+|---|---|
+| **Severity** | Medium |
+| **Resource Type** | `AgentIdentityBlueprint` |
+| **Required Permission** | `AgentIdentity.Read.All` |
+| **Graph Endpoints** | `GET /applications/microsoft.graph.agentIdentityBlueprint`, `GET /applications/{id}/inheritablePermissions` |
+| **Frameworks** | NIST 800-53 (AC-6) |
+
+**What it detects:** Blueprints where the `inheritablePermissions` collection is empty or unset. Without inheritable permission restrictions, there is no declared intent about which scopes agent instances should receive from the blueprint.
+
+**Detection logic:** For each blueprint, if `not bp.inheritable_permissions` (empty list or falsy), emit a FAIL.
+
+**InheritablePermissions explained:** The `inheritablePermissions` property on a blueprint defines how permissions are inherited by agent instances:
+
+- **`enumeratedScopes`** — Only the explicitly listed scope GUIDs can be inherited. This is the recommended setting — it provides an allowlist of permissions.
+- **`noScopes`** — Agent instances cannot inherit any permissions from the blueprint. They must be granted permissions independently.
+- **`allAllowedScopes`** — Agent instances can inherit any permission (checked separately by `agent_002` at Critical severity).
+- **Empty/unset** — No declaration. This is what `agent_010` flags — the absence of any stated policy.
+
+**Risk:** Without `inheritablePermissions`, there is no documentation of the intended permission scope for agent instances. Admin reviewers cannot tell whether broad permissions are intentional or accidental. This creates governance friction and increases the risk of over-provisioning.
+
+**Remediation:** Configure `inheritablePermissions` with `enumeratedScopes` and an explicit list of allowed scope GUIDs. Use `PATCH /applications/{blueprintId}` with the `inheritablePermissions` collection. If agent instances should not inherit any permissions, use `noScopes`.
+
+---
+
+#### `entraid_agent_011` — Ensure no agent identity is disabled by Microsoft
+
+| | |
+|---|---|
+| **Severity** | Medium |
+| **Resource Type** | `AgentIdentity` |
+| **Required Permission** | `AgentIdentity.Read.All` |
+| **Graph Endpoints** | `GET /servicePrincipals/microsoft.graph.agentIdentity` |
+| **Frameworks** | NIST 800-53 (SI-4) |
+
+**What it detects:** Agent identities where `disabledByMicrosoftStatus` is set to a value other than `null` or `"NotDisabled"`. Microsoft may disable agent identities for violations of the services agreement, abuse detection, or compromise indicators. The most common value is `"DisabledDueToViolationOfServicesAgreement"`.
+
+**Detection logic:** For each agent, if `disabled_by_microsoft_status` is truthy **and** not equal to `"NotDisabled"`, emit a FAIL. The finding includes the specific status value in the title.
+
+**Why this is Medium (not High):** The agent is already disabled — it cannot authenticate or access resources. The finding alerts you to investigate why it was disabled and whether other agents from the same blueprint may be at risk. It's an indicator, not an active threat.
+
+**Risk:** A Microsoft-disabled agent may have been compromised, used for abuse, or violated platform policies. Other agents from the same blueprint (with the same code and configuration) may have similar issues. The disabled agent's credentials and permissions should also be reviewed.
+
+**Remediation:** Investigate the disabled agent's activity via audit logs (`GET /auditLogs/directoryAudits?$filter=targetResources/any(t:t/id eq '{id}')`). Review sibling agents from the same blueprint (those sharing the same `agentIdentityBlueprintId`). Contact Microsoft support if the disabling was unexpected.
+
+---
+
+#### `entraid_agent_012` — Ensure agent identities and blueprints have descriptions
+
+| | |
+|---|---|
+| **Severity** | Low |
+| **Resource Type** | `AgentIdentityBlueprint`, `AgentIdentity` |
+| **Required Permission** | `AgentIdentity.Read.All` |
+| **Graph Endpoints** | `GET /applications/microsoft.graph.agentIdentityBlueprint`, `GET /servicePrincipals/microsoft.graph.agentIdentity` |
+| **Frameworks** | NIST 800-53 (CM-8) |
+
+**What it detects:** Two conditions:
+1. **Blueprints** with no `description` **and** no meaningful `info` property (all URL fields are null)
+2. **Agent identities** with no `displayName` or whose `displayName` equals their `id` (GUID used as name)
+
+**Detection logic:** For blueprints, checks `not bp.description` and uses a helper `_has_meaningful_info()` that inspects the `info` dict — the Graph API returns `info` as `{"logoUrl": null, "marketingUrl": null, ...}` even when nothing is set, so the check verifies at least one value is non-null. For agents, checks if `display_name` is empty or equals the object `id`.
+
+**Why this matters:** During incident response or permission reviews, administrators need to quickly understand what an agent does, who it's for, and how to contact the responsible team. Missing metadata creates friction that slows response time and increases the risk of incorrect remediation actions (e.g., disabling a critical production agent because its purpose was unclear).
+
+**Risk:** Low — this is a governance hygiene finding, not a vulnerability. Missing descriptions do not directly enable attacks, but they degrade the organization's ability to manage and respond to agent-related incidents.
+
+**Remediation:** For blueprints, add a description via `PATCH /applications/{id}` with `{"description": "..."}`. Include purpose, scope, and contact info in the `info` property. For agents, set a meaningful display name via `PATCH /servicePrincipals/{id}` with `{"displayName": "..."}`.
+
+---
 
 ### Check Implementation Examples
 
