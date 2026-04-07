@@ -107,7 +107,7 @@ Every check includes:
 
 ### Agentic Identity Checks
 
-EntraLint is the first security scanner to provide dedicated checks for **Microsoft Entra Agent ID** — the GA platform (shipped March 2026) that gives AI agents their own first-class identity type in Entra ID. These 12 checks cover agent blueprints, blueprint principals, and agent identity instances, detecting issues like:
+EntraLint is the first security scanner to provide dedicated checks for **Microsoft Entra Agent ID** — the identity platform that gives AI agents their own first-class identity type in Entra ID (Graph API v1.0 since March 2026). These 12 checks cover agent blueprints, blueprint principals, and agent identity instances, detecting issues like:
 
 - Agents holding dangerous or blocked permissions (e.g., `Files.ReadWrite.All`, `RoleManagement.ReadWrite.Directory`)
 - Blueprints using `allAllowedScopes` inheritance (allows agents to inherit any permission)
@@ -383,28 +383,177 @@ custom_checks_dirs:
 
 ## Custom Checks
 
-You can extend EntraLint with your own checks. Create a Python file in `~/.entralint/custom_checks/` or a local `.entralint/checks/` directory — EntraLint auto-discovers them alongside the built-in checks.
+You can extend EntraLint with your own security checks. Custom checks work exactly like built-in checks — they're auto-discovered, run alongside all other checks, and appear in every output format (table, JSON, SARIF, HTML).
+
+### Where to Put Custom Checks
+
+EntraLint auto-discovers custom checks from these locations (no config needed for the first two):
+
+| Location | When to Use |
+|---|---|
+| `~/.entralint/custom_checks/` | Personal checks that apply to all your projects |
+| `.entralint/checks/` (in your project) | Team checks committed to your repo |
+| Any path in `custom_checks_dirs` config | Custom paths defined in `.entralint.yaml` |
+
+Custom check files can be **standalone `.py` files** — no `__init__.py`, no package structure required. Just drop a `.py` file in one of the directories above.
+
+### Step-by-Step: Writing a Custom Check
+
+**1. Create the check file:**
+
+```bash
+mkdir -p .entralint/checks
+```
+
+**2. Write the check class** — here's a complete, working example:
 
 ```python
-from entralint.core.models import CheckMetadata, Finding, Severity, Status
-from entralint.core.registry import BaseCheck, check
+# .entralint/checks/check_no_display_name.py
 
-@check
-class MyCustomCheck(BaseCheck):
-    metadata = CheckMetadata(
-        check_id="custom_001",
-        title="My Custom Check",
-        category="organization",
-        severity=Severity.MEDIUM,
-        description="Checks for a custom condition",
-        remediation="Fix the condition",
-        frameworks=["Internal Policy"],
-    )
+from entralint.core.check import BaseCheck, CheckMetadata, Finding, Remediation, Severity, Status
+from entralint.core.context import TenantContext
 
-    def execute(self, ctx) -> list[Finding]:
-        # Access tenant data via ctx (TenantContext)
-        # Return PASS or FAIL findings
-        return [Finding(status=Status.PASS, title="All good")]
+
+class CheckNoDisplayName(BaseCheck):
+    """Flag service principals with no display name."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            metadata=CheckMetadata(
+                check_id="custom_sp_001",
+                check_title="Service principals should have a display name",
+                service_name="Service Principals",
+                severity=Severity.LOW,
+                resource_type="ServicePrincipal",
+                description="Identifies service principals with an empty or missing display name, making audit and incident response harder.",
+                risk="Unnamed service principals are difficult to identify during security reviews and incident response.",
+                remediation=Remediation(
+                    recommendation="Set a descriptive display name on every service principal.",
+                    url="https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/add-application-portal",
+                ),
+                required_permissions=["Application.Read.All"],
+            ),
+        )
+
+    def execute(self, context: TenantContext) -> list[Finding]:
+        findings: list[Finding] = []
+
+        for sp in context.service_principals:
+            if not sp.display_name or not sp.display_name.strip():
+                findings.append(
+                    Finding(
+                        check_id=self.metadata.check_id,
+                        status=Status.FAIL,
+                        severity=self.metadata.severity,
+                        resource_type="ServicePrincipal",
+                        resource_id=sp.id,
+                        title=f"Service principal {sp.app_id} has no display name",
+                        description=f"AppId: {sp.app_id}",
+                        remediation=self.metadata.remediation.recommendation,
+                    )
+                )
+
+        if not findings:
+            findings.append(
+                Finding(
+                    check_id=self.metadata.check_id,
+                    status=Status.PASS,
+                    severity=self.metadata.severity,
+                    title="All service principals have a display name",
+                )
+            )
+
+        return findings
+```
+
+**3. Run it:**
+
+```bash
+uv run entralint scan
+```
+
+Your check appears automatically in the results — no registration, no config changes.
+
+### Available Data in `TenantContext`
+
+The `context` parameter in `execute()` gives you access to all data fetched from the tenant:
+
+| Field | Type | Description |
+|---|---|---|
+| `context.users` | `list[User]` | All users (members and guests) |
+| `context.applications` | `list[Application]` | App registrations |
+| `context.service_principals` | `list[ServicePrincipal]` | Service principals (enterprise apps) |
+| `context.conditional_access_policies` | `list[ConditionalAccessPolicy]` | CA policies |
+| `context.role_assignments` | `list[DirectoryRoleAssignment]` | Directory role assignments |
+| `context.app_role_assignments` | `list[AppRoleAssignment]` | App role grants |
+| `context.oauth2_permission_grants` | `list[dict]` | Delegated permission grants |
+| `context.organization` | `Organization` | Tenant org info, verified domains |
+| `context.authentication_methods_policy` | `dict` | Auth methods policy (MFA, FIDO2, etc.) |
+| `context.authorization_policy` | `dict` | Authorization policy settings |
+| `context.security_defaults_policy` | `dict` | Security defaults state |
+| `context.cross_tenant_access_policy` | `dict` | Cross-tenant access settings |
+| `context.named_locations` | `list[dict]` | Named/trusted locations |
+| `context.agent_identities` | `list[AgentIdentity]` | Agent identity instances |
+| `context.agent_identity_blueprints` | `list[AgentIdentityBlueprint]` | Agent blueprints |
+| `context.tenant_id` | `str` | Tenant GUID |
+| `context.granted_permissions` | `set[str]` | Permissions the scan has |
+
+### Findings: PASS vs FAIL
+
+Every check must return a `list[Finding]`. The key rules:
+
+- Return `Status.FAIL` for each resource that violates the check
+- Return a single `Status.PASS` if everything looks good
+- Always set `check_id` to match your `metadata.check_id`
+- Set `resource_id` on FAIL findings so users know which resource to fix
+- The `remediation` field on a Finding is the text shown to the user
+
+### Optional: Metadata JSON File
+
+Instead of defining metadata in Python, you can use a separate JSON file. This is how the built-in checks work — it keeps the Python file focused on logic:
+
+```
+.entralint/checks/
+    check_no_display_name/
+        __init__.py                              # empty file
+        check_no_display_name.py                 # check class
+        check_no_display_name.metadata.json      # metadata
+```
+
+The JSON uses PascalCase keys:
+
+```json
+{
+    "CheckID": "custom_sp_001",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Service principals should have a display name",
+    "ServiceName": "Service Principals",
+    "Severity": "LOW",
+    "ResourceType": "ServicePrincipal",
+    "Description": "Identifies service principals with an empty or missing display name.",
+    "Risk": "Unnamed service principals are difficult to identify during reviews.",
+    "Remediation": {
+        "Recommendation": "Set a descriptive display name on every service principal.",
+        "Url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/add-application-portal"
+    },
+    "RequiredPermissions": ["Application.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "Frameworks": []
+}
+```
+
+### Verify Your Check
+
+```bash
+# Confirm your check is discovered
+uv run entralint list-checks | grep custom
+
+# See full details
+uv run entralint show-check custom_sp_001
+
+# Run only your check
+uv run entralint scan --checks custom_sp_001
 ```
 
 ## Permissions
