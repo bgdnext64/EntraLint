@@ -1,0 +1,194 @@
+name: "EntraLint"
+description: "Scan your Entra ID tenant for security misconfigurations and upload results to GitHub Code Scanning"
+author: "bgdnext64"
+
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  tenant-id:
+    description: "Entra ID tenant ID or domain"
+    required: true
+  client-id:
+    description: "App registration client ID (not required when using default-credential)"
+    required: false
+    default: ""
+  client-secret:
+    description: "Client secret for app-only authentication"
+    required: false
+    default: ""
+  client-certificate-path:
+    description: "Path to PEM certificate file for app-only authentication"
+    required: false
+    default: ""
+  use-default-credential:
+    description: "Use DefaultAzureCredential (workload identity federation, managed identity, az CLI). Requires azure/login@v2 step before this action."
+    required: false
+    default: "false"
+  fail-on:
+    description: "Severity threshold for non-zero exit: critical, high, medium, low, none"
+    required: false
+    default: "medium"
+  severity:
+    description: "Only report findings at or above this severity (comma-separated)"
+    required: false
+    default: ""
+  checks:
+    description: "Comma-separated list of check IDs to run (default: all)"
+    required: false
+    default: ""
+  category:
+    description: "Only run checks in this category"
+    required: false
+    default: ""
+  config:
+    description: "Path to .entralint.yaml config file"
+    required: false
+    default: ""
+  baseline:
+    description: "Path to baseline file for drift detection"
+    required: false
+    default: ""
+  fail-on-new:
+    description: "Exit non-zero only for NEW findings not in baseline"
+    required: false
+    default: "false"
+  update-baseline:
+    description: "Save current scan as the new baseline"
+    required: false
+    default: "false"
+  upload-sarif:
+    description: "Upload SARIF results to GitHub Code Scanning"
+    required: false
+    default: "true"
+  python-version:
+    description: "Python version to use"
+    required: false
+    default: "3.13"
+
+outputs:
+  sarif-file:
+    description: "Path to the generated SARIF report"
+    value: ${{ steps.scan.outputs.sarif-file }}
+  findings-count:
+    description: "Total number of findings"
+    value: ${{ steps.scan.outputs.findings-count }}
+  critical-count:
+    description: "Number of critical findings"
+    value: ${{ steps.scan.outputs.critical-count }}
+  high-count:
+    description: "Number of high findings"
+    value: ${{ steps.scan.outputs.high-count }}
+  exit-code:
+    description: "Exit code from the scan (0 = pass, 1 = findings exceed threshold)"
+    value: ${{ steps.scan.outputs.exit-code }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Install EntraLint
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: uv sync --no-dev
+
+    - name: Run EntraLint scan
+      id: scan
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        ENTRALINT_TENANT_ID: ${{ inputs.tenant-id }}
+        ENTRALINT_CLIENT_ID: ${{ inputs.client-id }}
+        ENTRALINT_CLIENT_SECRET: ${{ inputs.client-secret }}
+        ENTRALINT_CLIENT_CERTIFICATE_PATH: ${{ inputs.client-certificate-path }}
+        ENTRALINT_USE_DEFAULT_CREDENTIAL: ${{ inputs.use-default-credential }}
+      run: |
+        SARIF_FILE="${RUNNER_TEMP}/entralint-results.sarif"
+
+        # Build command arguments
+        ARGS="--format sarif --output-file ${SARIF_FILE} --quiet"
+        ARGS="${ARGS} --fail-on ${{ inputs.fail-on }}"
+
+        if [ -n "${{ inputs.severity }}" ]; then
+          ARGS="${ARGS} --severity ${{ inputs.severity }}"
+        fi
+        if [ -n "${{ inputs.checks }}" ]; then
+          ARGS="${ARGS} --checks ${{ inputs.checks }}"
+        fi
+        if [ -n "${{ inputs.category }}" ]; then
+          ARGS="${ARGS} --category ${{ inputs.category }}"
+        fi
+        if [ -n "${{ inputs.config }}" ]; then
+          ARGS="${ARGS} --config ${{ inputs.config }}"
+        fi
+        if [ -n "${{ inputs.baseline }}" ]; then
+          ARGS="${ARGS} --baseline ${{ inputs.baseline }}"
+        fi
+        if [ "${{ inputs.fail-on-new }}" = "true" ]; then
+          ARGS="${ARGS} --fail-on-new"
+        fi
+        if [ "${{ inputs.update-baseline }}" = "true" ]; then
+          ARGS="${ARGS} --update-baseline"
+        fi
+
+        # Run the scan — capture exit code without failing the step
+        set +e
+        uv run entralint scan ${ARGS}
+        SCAN_EXIT=$?
+        set -e
+
+        # Parse SARIF for counts
+        if [ -f "${SARIF_FILE}" ]; then
+          TOTAL=$(python3 -c "
+        import json, sys
+        with open('${SARIF_FILE}') as f:
+            data = json.load(f)
+        results = data.get('runs', [{}])[0].get('results', [])
+        print(len(results))
+        " 2>/dev/null || echo "0")
+
+          CRITICAL=$(python3 -c "
+        import json
+        with open('${SARIF_FILE}') as f:
+            data = json.load(f)
+        results = data.get('runs', [{}])[0].get('results', [])
+        print(sum(1 for r in results if r.get('level') == 'error' and 'critical' in r.get('message', {}).get('text', '').lower()))
+        " 2>/dev/null || echo "0")
+
+          HIGH=$(python3 -c "
+        import json
+        with open('${SARIF_FILE}') as f:
+            data = json.load(f)
+        results = data.get('runs', [{}])[0].get('results', [])
+        print(sum(1 for r in results if r.get('level') == 'error'))
+        " 2>/dev/null || echo "0")
+        else
+          TOTAL=0
+          CRITICAL=0
+          HIGH=0
+        fi
+
+        # Set outputs
+        echo "sarif-file=${SARIF_FILE}" >> $GITHUB_OUTPUT
+        echo "findings-count=${TOTAL}" >> $GITHUB_OUTPUT
+        echo "critical-count=${CRITICAL}" >> $GITHUB_OUTPUT
+        echo "high-count=${HIGH}" >> $GITHUB_OUTPUT
+        echo "exit-code=${SCAN_EXIT}" >> $GITHUB_OUTPUT
+
+        # Exit with the scan's exit code
+        exit ${SCAN_EXIT}
+
+    - name: Upload SARIF to GitHub Code Scanning
+      if: ${{ inputs.upload-sarif == 'true' && always() && steps.scan.outputs.sarif-file != '' }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ steps.scan.outputs.sarif-file }}
+        category: "entralint"

@@ -13,7 +13,7 @@ if sys.platform == "win32":
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import entralint
-from entralint.cli.commands import cache, config, login, report, scan
+from entralint.cli.commands import cache, config, login, permissions, report, scan
 
 console = Console()
 
@@ -31,6 +31,7 @@ app.command()(login.login)
 app.command()(report.report)
 app.command()(config.config)
 app.command()(cache.cache)
+app.command()(permissions.permissions)
 
 
 @app.command()

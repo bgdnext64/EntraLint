@@ -26,6 +26,7 @@ class AuthMethod(StrEnum):
     AUTH_CODE = "auth_code"
     DEVICE_CODE = "device_code"
     CLIENT_CREDENTIALS = "client_credentials"
+    DEFAULT_CREDENTIAL = "default_credential"
     MANAGED_IDENTITY = "managed_identity"
 
 
@@ -53,8 +54,9 @@ def _save_cache(tenant_id: str, cache: msal.SerializableTokenCache) -> None:
 class AuthProvider:
     """MSAL wrapper for Entra ID authentication.
 
-    Supports device code flow (interactive) and client credentials (CI/CD)
-    with per-tenant token isolation and persistent caching.
+    Supports device code flow (interactive), client credentials (CI/CD),
+    and DefaultAzureCredential (workload identity federation, managed identity,
+    az CLI) with per-tenant token isolation and persistent caching.
     """
 
     def __init__(
@@ -65,7 +67,7 @@ class AuthProvider:
         client_secret: str | None = None,
         client_certificate_path: str | None = None,
     ) -> None:
-        if not client_id:
+        if method != AuthMethod.DEFAULT_CREDENTIAL and not client_id:
             raise AuthenticationError(
                 "No client ID configured. Set ENTRALINT_CLIENT_ID environment "
                 "variable or pass --client-id to the command."
@@ -75,9 +77,14 @@ class AuthProvider:
         self.method = method
         self._client_secret = client_secret
         self._client_certificate_path = client_certificate_path
-        self._cache = _load_cache(tenant_id)
-        self._app = self._build_msal_app()
         self._token: str | None = None
+
+        if method == AuthMethod.DEFAULT_CREDENTIAL:
+            self._cache = msal.SerializableTokenCache()
+            self._app: msal.ClientApplication | None = None
+        else:
+            self._cache = _load_cache(tenant_id)
+            self._app = self._build_msal_app()
 
     def _build_msal_app(self) -> msal.ClientApplication:
         """Create the appropriate MSAL application instance."""
@@ -145,8 +152,30 @@ class AuthProvider:
 
     def acquire_token_client_credentials(self) -> str:
         """Acquire a token using client credentials (app-only, no user)."""
+        if self._app is None:
+            raise AuthenticationError("MSAL app not initialized for client credentials.")
         result = self._app.acquire_token_for_client(scopes=DEFAULT_SCOPES)
         return self._handle_result(result)
+
+    def acquire_token_default_credential(self) -> str:
+        """Acquire a token using azure-identity DefaultAzureCredential.
+
+        Works with workload identity federation (GitHub Actions OIDC),
+        managed identity (Azure-hosted), Azure CLI, and other credential
+        types supported by the Azure Identity SDK.
+        """
+        from azure.core.exceptions import ClientAuthenticationError as AzureAuthError
+        from azure.identity import DefaultAzureCredential
+
+        try:
+            credential = DefaultAzureCredential()
+            token = credential.get_token("https://graph.microsoft.com/.default")
+            self._token = token.token
+            return self._token
+        except AzureAuthError as exc:
+            raise AuthenticationError(
+                f"DefaultAzureCredential failed: {exc}"
+            ) from exc
 
     def _handle_result(self, result: dict[str, Any]) -> str:
         """Extract access_token from an MSAL result or raise on error."""

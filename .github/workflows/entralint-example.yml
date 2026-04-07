@@ -1,0 +1,48 @@
+name: EntraLint Security Scan
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"  # Every Monday at 6 AM UTC
+  workflow_dispatch:       # Manual trigger
+
+permissions:
+  security-events: write  # Required for uploading SARIF
+  contents: read
+  id-token: write         # Required for workload identity federation
+
+jobs:
+  # Option A: Client secret authentication
+  scan-with-secret:
+    name: Scan (Client Secret)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run EntraLint
+        uses: bgdnext64/EntraLint@main
+        with:
+          tenant-id: ${{ secrets.ENTRALINT_TENANT_ID }}
+          client-id: ${{ secrets.ENTRALINT_CLIENT_ID }}
+          client-secret: ${{ secrets.ENTRALINT_CLIENT_SECRET }}
+          fail-on: high
+
+  # Option B: Workload identity federation (no secrets needed)
+  scan-with-wif:
+    name: Scan (Workload Identity Federation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run EntraLint
+        uses: bgdnext64/EntraLint@main
+        with:
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          use-default-credential: "true"
+          fail-on: high

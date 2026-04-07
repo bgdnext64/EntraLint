@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated
@@ -67,7 +68,11 @@ async def _fetch_and_scan(
     tenant_id: str | None = None,
     no_cache: bool = False,
     offline: bool = False,
-) -> list[Finding]:
+) -> tuple[list[Finding], str, str]:
+    """Fetch Graph data and run checks.
+
+    Returns (findings, tenant_display_name, tenant_primary_domain).
+    """
     """Fetch Graph data and run checks."""
     granted_permissions: set[str] = set()
     fetch_results: list[tuple[str, str, str]] = []  # (label, status_icon, detail)
@@ -134,6 +139,28 @@ async def _fetch_and_scan(
                 except Exception as exc:
                     users = []
                     _fail("Users", str(exc))
+
+            # --- Organization ---
+            org_display_name = ""
+            org_primary_domain = ""
+            try:
+                raw_org = await graph.get("/organization")
+                org_list = raw_org.get("value", [])
+                if org_list:
+                    org = org_list[0]
+                    org_display_name = org.get("displayName", "")
+                    # Get primary verified domain
+                    domains = org.get("verifiedDomains", [])
+                    org_primary_domain = next(
+                        (d["name"] for d in domains if d.get("isDefault")),
+                        "",
+                    )
+                    detail = org_display_name
+                    if org_primary_domain:
+                        detail += f" ({org_primary_domain})"
+                    _ok("Organization", detail)
+            except Exception as exc:
+                _fail("Organization", str(exc))
 
             # --- Security Defaults policy ---
             security_defaults: dict = {}
@@ -401,7 +428,7 @@ async def _fetch_and_scan(
         engine.build_execution_order()
         findings = engine.execute(context)
 
-        return findings
+        return findings, org_display_name, org_primary_domain
 
 
 def _print_finding(finding: Finding, verbose: bool, *, tag: str = "") -> None:
@@ -503,6 +530,8 @@ def scan(
     """Scan an Entra ID tenant for security misconfigurations."""
     # --- Resolve tenant ---
     if not tenant:
+        tenant = os.environ.get("ENTRALINT_TENANT_ID")
+    if not tenant:
         cached = AuthProvider.list_cached_tenants()
         if len(cached) == 1:
             tenant = cached[0]
@@ -516,14 +545,56 @@ def scan(
             raise typer.Exit(code=1)
 
     # --- Acquire token ---
-    provider = AuthProvider(tenant_id=tenant, method=AuthMethod.DEVICE_CODE)
-    token = provider.acquire_token_silent()
-    if not token:
-        console.print(
-            "[red]Token expired or missing. Run 'entralint login --tenant "
-            f"{tenant}' to re-authenticate.[/red]"
+    # Auto-detect CI/CD auth method from environment variables.
+    # Priority: 1) workload identity federation / DefaultAzureCredential,
+    #           2) client secret or certificate, 3) cached interactive token.
+    ci_secret = os.environ.get("ENTRALINT_CLIENT_SECRET")
+    ci_cert = os.environ.get("ENTRALINT_CLIENT_CERTIFICATE_PATH")
+    use_default_cred = (
+        os.environ.get("ENTRALINT_USE_DEFAULT_CREDENTIAL", "").lower()
+        in ("1", "true", "yes")
+    )
+    # Also detect GitHub Actions OIDC or Azure-hosted managed identity
+    has_wif = bool(
+        os.environ.get("AZURE_FEDERATED_TOKEN_FILE")
+        or os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
+    )
+    has_managed_id = bool(
+        os.environ.get("IDENTITY_ENDPOINT")
+        or os.environ.get("MSI_ENDPOINT")
+    )
+
+    if use_default_cred or has_wif or has_managed_id:
+        provider = AuthProvider(
+            tenant_id=tenant,
+            method=AuthMethod.DEFAULT_CREDENTIAL,
         )
-        raise typer.Exit(code=1)
+        try:
+            token = provider.acquire_token_default_credential()
+        except Exception as exc:
+            console.print(f"[red]DefaultAzureCredential auth failed:[/red] {exc}")
+            raise typer.Exit(code=1) from None
+    elif ci_secret or ci_cert:
+        provider = AuthProvider(
+            tenant_id=tenant,
+            method=AuthMethod.CLIENT_CREDENTIALS,
+            client_secret=ci_secret,
+            client_certificate_path=ci_cert,
+        )
+        try:
+            token = provider.acquire_token_client_credentials()
+        except Exception as exc:
+            console.print(f"[red]Client credentials auth failed:[/red] {exc}")
+            raise typer.Exit(code=1) from None
+    else:
+        provider = AuthProvider(tenant_id=tenant, method=AuthMethod.DEVICE_CODE)
+        token = provider.acquire_token_silent()
+        if not token:
+            console.print(
+                "[red]Token expired or missing. Run 'entralint login --tenant "
+                f"{tenant}' to re-authenticate.[/red]"
+            )
+            raise typer.Exit(code=1)
 
     # For structured output formats piped to stdout, suppress Rich console output.
     # When writing to a file, show table output alongside.
@@ -564,7 +635,7 @@ def scan(
         exclude_set.update(r.check for r in cfg.suppress)
 
     # --- Run scan ---
-    findings = asyncio.run(
+    findings, tenant_display_name, tenant_primary_domain = asyncio.run(
         _fetch_and_scan(
             token=token,
             engine=engine,
@@ -663,8 +734,16 @@ def scan(
             c.metadata.check_id: c.metadata.model_dump(mode="json")
             for c in engine.discover()
         }
+        # Build tenant label: "Display Name (domain)" or just the guid
+        tenant_label = tenant or "Unknown"
+        if tenant_display_name and tenant_primary_domain:
+            tenant_label = f"{tenant_display_name} ({tenant_primary_domain})"
+        elif tenant_primary_domain:
+            tenant_label = tenant_primary_domain
+        elif tenant_display_name:
+            tenant_label = f"{tenant_display_name} ({tenant})"
         report_text = format_html(
-            findings, tenant_id=tenant, check_metadata=meta_lookup,
+            findings, tenant_id=tenant_label, check_metadata=meta_lookup,
         )
         # Default to file output for HTML
         if not output_file:

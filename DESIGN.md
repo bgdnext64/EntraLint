@@ -114,15 +114,30 @@ entralint login --tenant contoso.onmicrosoft.com --method device_code
 
 For scheduled scans, GitHub Actions, and Azure DevOps pipelines. Uses application permissions with certificate-based credentials (preferred over secrets).
 
+The scan command auto-detects `ENTRALINT_CLIENT_SECRET` or `ENTRALINT_CLIENT_CERTIFICATE_PATH` environment variables and switches to client credentials flow — no `entralint login` needed.
+
 ```yaml
-# GitHub Actions example
+# GitHub Actions — using the reusable action
+- name: EntraLint Security Scan
+  uses: bgdnext64/EntraLint@main
+  with:
+    tenant-id: ${{ secrets.ENTRALINT_TENANT_ID }}
+    client-id: ${{ secrets.ENTRALINT_CLIENT_ID }}
+    client-secret: ${{ secrets.ENTRALINT_CLIENT_SECRET }}
+    fail-on: high
+```
+
+```yaml
+# GitHub Actions — manual invocation
 - name: EntraLint Security Scan
   env:
     ENTRALINT_TENANT_ID: ${{ secrets.TENANT_ID }}
     ENTRALINT_CLIENT_ID: ${{ secrets.CLIENT_ID }}
-    ENTRALINT_CLIENT_CERTIFICATE_PATH: ${{ secrets.CERT_PATH }}
-  run: entralint scan --output sarif --output-file results.sarif
+    ENTRALINT_CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+  run: entralint scan --fail-on critical --quiet -f sarif --output-file results.sarif
 ```
+
+The reusable action (`uses: bgdnext64/EntraLint@main`) handles Python/uv setup, runs the scan, and uploads SARIF to GitHub Code Scanning automatically. See `action.yml` for the full input/output specification.
 
 ### Flow 3: Managed Identity for Azure-hosted deployments
 
@@ -149,6 +164,16 @@ When running inside Azure (Functions, App Service, AKS, Automation), the tool de
 ### Extended permissions (optional)
 
 `Reports.Read.All`, `SecurityAlert.Read.All`, `AccessReview.Read.All`, `CrossTenantInformation.ReadBasic.All`
+
+### Permission grant scripts
+
+The `entralint permissions` command introspects all discovered checks and aggregates their `RequiredPermissions` metadata. It outputs:
+
+- **Table** (default) — list of permissions, how many checks depend on each, and the well-known Graph app role GUID
+- **PowerShell** — complete `Microsoft.Graph` SDK script using `New-MgServicePrincipalAppRoleAssignment` with idempotent checks
+- **Azure CLI** — bash script using `az rest` to POST `appRoleAssignments`
+
+Both script formats include the stable app role GUIDs for each permission, handle already-granted roles, and require only `--client-id` to be fully runnable.
 
 ### License-gated endpoints
 
@@ -562,6 +587,8 @@ Permission coverage: 65/70 checks runnable
   ⚠ 2 checks skipped: missing Reports.Read.All
 ```
 
+To resolve missing permissions, use `entralint permissions -f powershell --client-id APP_ID` to generate a ready-to-run grant script.
+
 ### License detection
 
 The engine queries `GET /subscribedSkus` at scan start to determine the tenant's Entra ID license tier and maps it to feature availability:
@@ -622,6 +649,7 @@ entralint report   [--input scan-results.json] [--format html|pdf]
 entralint list-checks    [--category CATEGORY] [--severity SEVERITY]
 entralint list-frameworks
 entralint show-check     CHECK_ID
+entralint permissions [--format table|powershell|azcli] [--client-id CLIENT_ID]
 entralint config         [--init] [--add-tenant] [--list-tenants]
 entralint cache          [--clear] [--status] [--tenant TENANT]
 entralint version
