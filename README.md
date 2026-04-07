@@ -2,7 +2,7 @@
 
 **Lint your Entra ID. Fix before they breach.**
 
-EntraLint is an open-source, CLI-first security linter for [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/fundamentals/whatis) (formerly Azure Active Directory). Think of it as ESLint or Ruff, but for your identity configuration instead of your code — it reads your tenant settings, checks them against security best practices and compliance benchmarks, and tells you exactly what to fix.
+EntraLint is an open-source, CLI-first security linter for [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/fundamentals/whatis) (formerly Azure Active Directory). Think of it as ESLint or Ruff, but for your identity configuration instead of your code. It reads your tenant settings, checks them against security best practices and compliance benchmarks, and tells you exactly what to fix.
 
 ## Why EntraLint?
 
