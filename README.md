@@ -2,6 +2,8 @@
 
 **Lint your Entra ID. Fix before they breach.**
 
+> **Disclaimer:** EntraLint is an independent, community-driven open-source project created by Brian Davis. It is **not** affiliated with, endorsed by, or sponsored by Microsoft. "Entra" and "Azure" are trademarks of Microsoft Corporation.
+
 EntraLint is an open-source, CLI-first security linter for [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/fundamentals/whatis) (formerly Azure Active Directory). Think of it as ESLint or Ruff, but for your identity configuration instead of your code. It reads your tenant settings, checks them against security best practices and compliance benchmarks, and tells you exactly what to fix.
 
 ## Why EntraLint?
@@ -629,3 +631,7 @@ src/entralint/
 ## License
 
 AGPL-3.0 — See [LICENSE](LICENSE) for details.
+
+## Disclaimer
+
+EntraLint is an independent open-source project created and maintained by Brian Davis. It is provided "as is" without warranty of any kind. This project is **not** affiliated with, officially maintained by, endorsed by, or sponsored by Microsoft Corporation. All product names, trademarks, and registered trademarks are the property of their respective owners.
