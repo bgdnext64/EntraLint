@@ -10,12 +10,53 @@ EntraLint is an open-source, CLI-first security linter for [Microsoft Entra ID](
 
 Identity misconfigurations are one of the most common root causes of cloud breaches. Microsoft Entra ID controls who can access what in your organization — your users, apps, service principals, conditional access policies, privileged roles, and now AI agent identities. A single misconfiguration (no MFA requirement, over-privileged service principal, stale admin account) can be all an attacker needs.
 
-The problem is that Entra ID has hundreds of security-relevant settings spread across dozens of admin blades. Keeping track of them manually doesn't scale, especially across multiple tenants. EntraLint automates this:
+Microsoft provides powerful built-in tools like Identity Secure Score and Entra Recommendations to track your tenant's security posture. EntraLint extends that coverage into your engineering workflow — adding CI/CD integration, deeper checks across applications and service principals, compliance framework mappings, and coverage for the newest Entra ID surfaces:
 
 - **Finds misconfigurations automatically** — 82 checks cover conditional access, MFA, privileged roles, app registrations, service principals, guest accounts, organization settings, cross-tenant access, and AI agent identities
 - **Maps to compliance frameworks** — Every finding references CIS Microsoft 365 Foundations Benchmark v5, CISA SCuBA (BOD 25-01), and/or NIST 800-53 controls
 - **Fits into your workflow** — Run it locally during development, in CI/CD pipelines via SARIF output, or as a scheduled audit tool
 - **Requires read-only access** — EntraLint never modifies your tenant. It only reads configuration data through the Microsoft Graph API
+
+## Why Not Just Use Secure Score?
+
+It's a fair question. Microsoft ships excellent built-in tools — Identity Secure Score, Entra Recommendations, and Defender for Identity — and you should absolutely use them. EntraLint is designed to complement those tools, not replace them. Here's how the coverage compares:
+
+| Capability | Identity Secure Score | Entra Recommendations | Defender for Identity | EntraLint |
+|---|---|---|---|---|
+| **Where it runs** | Azure portal dashboard | Azure portal dashboard | Requires sensor on DCs / Entra Connect | CLI, CI/CD pipelines, GitHub Actions |
+| **Focus area** | ~20 high-level Entra ID settings | ~50 Entra ID + hybrid recommendations | On-premises AD, Kerberos, NTLM, certificates | Cloud-native Entra ID configuration (82 checks) |
+| **App & SP credential hygiene** | — | Expiring creds only | — | 18 checks: expired, long-lived, dual-type, high-privilege grants, orphaned owners, stale SPs |
+| **Conditional Access depth** | MFA, legacy auth, risk policies | Same as Secure Score | — | 14 checks: device code flow, session controls, exclusion sprawl, guest targeting, device compliance for admins |
+| **Privileged role analysis** | GA count, least privilege | Same | Lateral movement paths (on-prem) | 10 checks: PIM usage, break-glass accounts, guests in roles, SPs in roles, multi-role users, per-role caps |
+| **Agentic identity (Entra Agent ID)** | — | — | — | 12 dedicated checks (first scanner to cover this) |
+| **Cross-tenant & guest access** | — | — | — | 8 checks: inbound/outbound trust, MFA trust, guest invite settings, guest CA coverage |
+| **Output formats** | Portal only | Portal only | Portal / Sentinel | Table, JSON, SARIF, HTML |
+| **CI/CD gating** | No | No | No | `--fail-on critical` exits non-zero |
+| **Baseline drift detection** | No | No | No | `--baseline` + `--fail-on-new` |
+| **Compliance mapping** | — | — | — | CIS M365 v5, CISA SCuBA, NIST 800-53 per check |
+| **Custom checks** | No | No | No | Drop a `.py` file, auto-discovered |
+| **Cost** | Free (portal) | Free / P1 for some | Requires Defender for Identity license | Free, open-source (AGPL-3.0) |
+
+### What overlaps and what doesn't
+
+Microsoft's built-in tools and EntraLint are largely complementary — there's minimal redundancy. 13 of EntraLint's 82 checks overlap with what Secure Score and Entra Recommendations already cover, while the remaining **69 checks extend into areas** those tools weren't designed to address (CI/CD-oriented linting, deep app/SP credential analysis, cross-tenant trust, and agentic identity).
+
+| Coverage source | Overlapping checks | What's covered |
+|---|---|---|
+| **Identity Secure Score** | 8 checks | MFA for all users, MFA for admins, block legacy auth, sign-in risk policy, user risk policy, restrict user consent, SSPR, Global Admin count |
+| **Entra Recommendations** | 5 additional | Expiring app credentials, unused app credentials, expiring SP credentials, stale user accounts, least-privilege roles |
+| **Defender for Identity** | 0 | Defender for Identity excels at on-premises AD security — EntraLint focuses on the cloud-native Entra ID configuration surface |
+| **Unique to EntraLint** | **69 checks** | Device code flow blocking, persistent browser sessions, named location review, CA exclusion sprawl, guest CA targeting, sign-in frequency for admins, FIDO2/passwordless, banned password lists, number matching, TAP lifetime, certificate-based auth, break-glass accounts, guests/SPs in privileged roles, per-role assignment caps, multi-role detection, app secret lifetime, non-admin app owners with high-priv permissions, excessive delegated permissions, multi-tenant app review, disabled SPs with credentials, third-party SP permissions, broad delegated grants, dual credential types, cross-tenant trust settings, guest invitation restrictions, app registration restrictions, all 12 agentic identity checks |
+
+### When to use what
+
+**Use Secure Score / Entra Recommendations when** you want a quick, portal-based health check of your tenant's fundamentals — it's built-in and free.
+
+**Use Defender for Identity when** you have on-premises Active Directory and need to detect Kerberos misconfigurations, lateral movement paths, and certificate services issues.
+
+**Use EntraLint when** you need identity security checks in your CI/CD pipeline, want to gate deployments on identity posture, need to track configuration drift between scans, require compliance framework mappings (CIS, CISA SCuBA, NIST) per finding, want to lint service principal permissions and app credential hygiene in depth, or need to audit the new Entra Agent ID surface.
+
+EntraLint is not a replacement for Secure Score — it's a complement. Run both. Secure Score gives you a portal-based overview of your tenant's health; EntraLint gives you a CLI-first linter that fits into your DevOps pipeline.
 
 ## Quick Start
 
