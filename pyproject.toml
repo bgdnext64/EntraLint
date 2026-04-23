@@ -29,6 +29,8 @@ dependencies = [
     "azure-identity>=1.17,<2",
     "pyyaml>=6,<7",
     "jinja2>=3,<4",
+    # Pin transitive cryptography to a patched version (GHSA-p423-j2cm-9vmq).
+    "cryptography>=46.0.7",
 ]
 
 [project.urls]
@@ -49,8 +51,8 @@ packages = ["src/entralint"]
 
 [tool.uv]
 dev-dependencies = [
-    "pytest>=8,<9",
-    "pytest-asyncio>=0.23,<1",
+    "pytest>=9.0.3,<10",
+    "pytest-asyncio>=1.0,<2",
     "mypy>=1.10,<2",
     "ruff>=0.5,<1",
     "types-pyyaml>=6,<7",
