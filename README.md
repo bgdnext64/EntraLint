@@ -646,7 +646,17 @@ uv run ruff check src/ tests/
 
 # Type check
 uv run mypy
+
+# Optional: enable pre-commit hooks (ruff + mypy + hygiene checks)
+pipx install pre-commit
+pre-commit install
 ```
+
+### Writing a new check
+
+See [`docs/authoring-checks.md`](docs/authoring-checks.md) for a
+step-by-step walkthrough of adding a new built-in check, including the
+metadata JSON schema and required test coverage.
 
 ### Project Structure
 

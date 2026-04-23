@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import logging
 import pkgutil
 import sys
 from pathlib import Path
@@ -13,6 +14,9 @@ from entralint.core.check import BaseCheck, Finding, Status
 
 if TYPE_CHECKING:
     from entralint.core.context import TenantContext
+
+
+logger = logging.getLogger(__name__)
 
 
 # Well-known directories for user-supplied custom checks.
@@ -77,7 +81,8 @@ class CheckEngine:
 
         try:
             package = importlib.import_module(package_name)
-        except ImportError:
+        except ImportError as exc:
+            logger.warning("Failed to import checks package %s: %s", package_name, exc)
             return found
 
         for _importer, modname, _ispkg in pkgutil.walk_packages(
@@ -85,24 +90,11 @@ class CheckEngine:
         ):
             try:
                 module = importlib.import_module(modname)
-            except ImportError:
+            except ImportError as exc:
+                logger.warning("Failed to import check module %s: %s", modname, exc)
                 continue
 
-            for attr_name in dir(module):
-                attr = getattr(module, attr_name)
-                if (
-                    isinstance(attr, type)
-                    and issubclass(attr, BaseCheck)
-                    and attr is not BaseCheck
-                    and hasattr(attr, "metadata")
-                ):
-                    try:
-                        found.append(attr())
-                    except TypeError:
-                        try:
-                            found.append(attr(metadata=attr.metadata))
-                        except Exception:
-                            continue
+            found.extend(self._instantiate_checks_from_module(module))
 
         return found
 
@@ -129,25 +121,43 @@ class CheckEngine:
             sys.modules[module_name] = module
             try:
                 spec.loader.exec_module(module)  # type: ignore[union-attr]
-            except Exception:
+            except Exception as exc:
+                logger.warning("Failed to load custom check %s: %s", py_file, exc)
                 continue
 
-            for attr_name in dir(module):
-                attr = getattr(module, attr_name)
-                if (
-                    isinstance(attr, type)
-                    and issubclass(attr, BaseCheck)
-                    and attr is not BaseCheck
-                    and hasattr(attr, "metadata")
-                ):
-                    try:
-                        found.append(attr())
-                    except TypeError:
-                        try:
-                            found.append(attr(metadata=attr.metadata))
-                        except Exception:
-                            continue
+            found.extend(CheckEngine._instantiate_checks_from_module(module))
         return found
+
+    @staticmethod
+    def _instantiate_checks_from_module(module: object) -> list[BaseCheck]:
+        """Find BaseCheck subclasses in a module and instantiate them.
+
+        Each check class is expected to carry a class-level ``metadata``
+        attribute and a zero-argument ``__init__`` that calls
+        ``super().__init__(metadata=...)``. If instantiation fails for any
+        reason, we log a warning and continue so one broken check cannot
+        take down discovery.
+        """
+        instances: list[BaseCheck] = []
+        for attr_name in dir(module):
+            attr = getattr(module, attr_name)
+            if not (
+                isinstance(attr, type)
+                and issubclass(attr, BaseCheck)
+                and attr is not BaseCheck
+                and hasattr(attr, "metadata")
+            ):
+                continue
+            try:
+                instances.append(attr())  # type: ignore[call-arg]
+            except Exception as exc:
+                logger.warning(
+                    "Failed to instantiate check %s.%s: %s",
+                    getattr(module, "__name__", "<unknown>"),
+                    attr_name,
+                    exc,
+                )
+        return instances
 
     def _path_to_package(self, path: Path) -> str | None:
         """Convert a filesystem path to a Python package name."""

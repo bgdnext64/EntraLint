@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import re
+import stat
+import sys
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -10,6 +14,8 @@ from typing import Any
 import msal
 
 from entralint.core.errors import AuthenticationError
+
+logger = logging.getLogger(__name__)
 
 # Default scopes for Microsoft Graph read-only access
 DEFAULT_SCOPES = ["https://graph.microsoft.com/.default"]
@@ -20,6 +26,32 @@ DEFAULT_CLIENT_ID = os.environ.get("ENTRALINT_CLIENT_ID", "")
 
 # Where token caches are stored
 CACHE_DIR = Path.home() / ".entralint" / "cache"
+
+# Matches either a GUID (tenant or client id) or a verified domain name
+# (e.g. "contoso.onmicrosoft.com"). MSAL accepts both, but we reject
+# obvious typos and shell-metacharacter injection up-front so they
+# cannot produce weird cache filenames.
+_GUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+_DOMAIN_RE = re.compile(r"^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$")
+
+
+def _validate_tenant_id(tenant_id: str) -> str:
+    """Return ``tenant_id`` if it looks like a GUID or domain, else raise."""
+    if not tenant_id or not (_GUID_RE.match(tenant_id) or _DOMAIN_RE.match(tenant_id)):
+        raise AuthenticationError(
+            f"Invalid tenant id: {tenant_id!r}. Expected a GUID or a verified domain "
+            "(e.g. 'contoso.onmicrosoft.com')."
+        )
+    return tenant_id
+
+
+def _validate_client_id(client_id: str) -> str:
+    """Return ``client_id`` if it looks like a GUID, else raise."""
+    if not _GUID_RE.match(client_id):
+        raise AuthenticationError(
+            f"Invalid client id: {client_id!r}. Expected a GUID."
+        )
+    return client_id
 
 
 class AuthMethod(StrEnum):
@@ -45,10 +77,37 @@ def _load_cache(tenant_id: str) -> msal.SerializableTokenCache:
 
 
 def _save_cache(tenant_id: str, cache: msal.SerializableTokenCache) -> None:
-    """Persist the MSAL token cache to disk."""
+    """Persist the MSAL token cache to disk with restrictive permissions.
+
+    The cache holds refresh tokens, so we write it atomically and set
+    owner-read/write-only (``0o600``) permissions on POSIX systems. On
+    Windows the home directory ACL already restricts access to the
+    current user, so ``chmod`` is best-effort there.
+    """
     path = _cache_path(tenant_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(cache.serialize(), encoding="utf-8")
+    try:
+        # os.open gives us control over the initial file mode, avoiding a
+        # window where the file exists with default (more permissive) perms.
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        fd = os.open(path, flags, 0o600)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(cache.serialize())
+        except Exception:
+            # fdopen closes fd on success; only close manually on failure
+            # before the with-block takes ownership.
+            raise
+    except OSError:
+        # Fallback path (unusual filesystems, etc.).
+        path.write_text(cache.serialize(), encoding="utf-8")
+
+    # Belt-and-braces: ensure perms are tight even if the file pre-existed.
+    if sys.platform != "win32":
+        try:
+            os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+        except OSError as exc:
+            logger.warning("Could not set 0600 on token cache %s: %s", path, exc)
 
 
 class AuthProvider:
@@ -72,8 +131,14 @@ class AuthProvider:
                 "No client ID configured. Set ENTRALINT_CLIENT_ID environment "
                 "variable or pass --client-id to the command."
             )
-        self.tenant_id = tenant_id
-        self.client_id = client_id
+        # Fail fast on obviously bogus identifiers rather than letting MSAL
+        # produce a confusing downstream error (or letting an attacker-controlled
+        # value end up in a cache filename).
+        self.tenant_id = _validate_tenant_id(tenant_id)
+        if client_id:
+            self.client_id = _validate_client_id(client_id)
+        else:
+            self.client_id = client_id
         self.method = method
         self._client_secret = client_secret
         self._client_certificate_path = client_certificate_path

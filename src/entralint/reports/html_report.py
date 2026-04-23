@@ -98,6 +98,20 @@ def format_html(
         indent=None,
     )
 
+    # Safely embed the JSON inside an inline <script> block. Without this,
+    # a finding containing "</script>" (or similar) could break out of the
+    # script tag and inject arbitrary HTML/JS into the report (XSS).
+    # The replacements below keep the string valid JSON *and* valid inside a
+    # <script> context. U+2028 / U+2029 are also escaped because they
+    # terminate JS string literals even though JSON permits them raw.
+    scan_data = (
+        scan_data.replace("<!--", "\\u003C!--")
+        .replace("<script", "\\u003Cscript")
+        .replace("</script", "\\u003C/script")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
+
     return _TEMPLATE.replace("{{SCAN_DATA}}", scan_data).replace(
         "{{GENERATED_AT}}", html.escape(now)
     ).replace(

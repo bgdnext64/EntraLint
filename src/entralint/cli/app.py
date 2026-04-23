@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.logging import RichHandler
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -17,12 +19,47 @@ from entralint.cli.commands import cache, config, login, permissions, report, sc
 
 console = Console()
 
+
+def _configure_logging(debug: bool) -> None:
+    """Wire stdlib ``logging`` to Rich. Idempotent across invocations."""
+    level = logging.DEBUG if debug else logging.WARNING
+    # Clear any handler we might have added previously (tests, repeated calls).
+    root = logging.getLogger()
+    for h in list(root.handlers):
+        if getattr(h, "_entralint_installed", False):
+            root.removeHandler(h)
+    handler = RichHandler(
+        console=Console(stderr=True),
+        show_path=False,
+        show_time=debug,
+        rich_tracebacks=debug,
+    )
+    handler._entralint_installed = True  # type: ignore[attr-defined]
+    root.addHandler(handler)
+    root.setLevel(level)
+    # Keep third-party chatter quiet unless the user asked for debug.
+    for noisy in ("httpx", "httpcore", "msal", "azure"):
+        logging.getLogger(noisy).setLevel(
+            logging.DEBUG if debug else logging.WARNING
+        )
+
+
 app = typer.Typer(
     name="entralint",
     help="Lint your Entra ID. Fix before they breach.",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
+
+
+@app.callback()
+def _root_callback(
+    debug: Annotated[
+        bool, typer.Option("--debug", help="Enable verbose debug logging to stderr.")
+    ] = False,
+) -> None:
+    """Global options applied to every subcommand."""
+    _configure_logging(debug=debug)
 
 # Register sub-commands
 app.command()(scan.scan)

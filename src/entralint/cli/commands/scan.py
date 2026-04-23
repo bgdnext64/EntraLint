@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated
 
+import httpx
 import typer
+from pydantic import ValidationError
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -26,6 +29,7 @@ from entralint.core.check import SEVERITY_RANK, Finding, Severity, Status
 from entralint.core.config import load_config_auto
 from entralint.core.context import TenantContext
 from entralint.core.engine import CheckEngine
+from entralint.core.errors import AuthenticationError, GraphAPIError
 from entralint.core.models import (
     AgentIdentity,
     AgentIdentityBlueprint,
@@ -43,7 +47,17 @@ from entralint.reports.html_report import format_html
 from entralint.reports.json_report import format_json
 from entralint.reports.sarif_report import format_sarif
 
+logger = logging.getLogger(__name__)
 console = Console()
+
+# Exception types we expect during fetch-and-degrade. Anything else
+# (e.g. AuthenticationExpiredError, programming errors) is fatal and must
+# propagate to the caller rather than silently producing empty data.
+_EXPECTED_FETCH_ERRORS: tuple[type[BaseException], ...] = (
+    GraphAPIError,
+    ValidationError,
+    httpx.HTTPError,
+)
 
 
 @contextmanager
@@ -58,6 +72,71 @@ SEVERITY_STYLES = {
     "MEDIUM": "yellow",
     "LOW": "blue",
 }
+
+
+# Bound concurrent Graph fan-out to avoid tripping throttling.
+_SP_FANOUT_CONCURRENCY = 10
+
+
+async def _fetch_with_select_fallback(
+    graph: GraphClient,
+    endpoint_with_select: str,
+    fallback_endpoint: str,
+) -> list[dict]:
+    """Try a ``$select``-ed endpoint first, fall back to the plain endpoint.
+
+    Some Graph endpoints (notably ``/users?$select=signInActivity``) require
+    an Entra ID P1 license. On licensing failures we transparently retry
+    without the projection so scans still surface something useful.
+    """
+    try:
+        return await graph.get_all_pages(endpoint_with_select)
+    except _EXPECTED_FETCH_ERRORS as exc:
+        logger.debug(
+            "Falling back from %s to %s: %s",
+            endpoint_with_select,
+            fallback_endpoint,
+            exc,
+        )
+        return await graph.get_all_pages(fallback_endpoint)
+
+
+async def _fetch_sp_app_role_assignments(
+    graph: GraphClient,
+    service_principals: list[ServicePrincipal],
+) -> list[AppRoleAssignment]:
+    """Fetch ``appRoleAssignments`` for every service principal concurrently.
+
+    Uses a :class:`~asyncio.Semaphore` to cap concurrency at
+    ``_SP_FANOUT_CONCURRENCY`` so we don't trigger Graph throttling.
+    Per-SP failures are logged and skipped so one bad SP can't blank out
+    the entire result set.
+    """
+    if not service_principals:
+        return []
+
+    sem = asyncio.Semaphore(_SP_FANOUT_CONCURRENCY)
+
+    async def _one(sp: ServicePrincipal) -> list[AppRoleAssignment]:
+        async with sem:
+            try:
+                raw = await graph.get(
+                    f"/servicePrincipals/{sp.id}/appRoleAssignments"
+                )
+            except _EXPECTED_FETCH_ERRORS as exc:
+                logger.debug(
+                    "appRoleAssignments fetch failed for sp=%s",
+                    sp.id,
+                    exc_info=exc,
+                )
+                return []
+            return [
+                AppRoleAssignment.model_validate(item)
+                for item in raw.get("value", [])
+            ]
+
+    results = await asyncio.gather(*(_one(sp) for sp in service_principals))
+    return [ara for sublist in results for ara in sublist]
 
 
 async def _fetch_and_scan(
@@ -105,8 +184,9 @@ async def _fetch_and_scan(
                 ]
                 granted_permissions.add("Policy.Read.All")
                 _ok("Conditional Access policies", f"{len(policies)} policies")
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
                 policies = []
+                logger.debug("Conditional Access fetch failed", exc_info=exc)
                 _fail("Conditional Access policies", str(exc))
 
             # --- Applications ---
@@ -117,28 +197,29 @@ async def _fetch_and_scan(
                 apps = [Application.model_validate(a) for a in raw_apps]
                 granted_permissions.add("Application.Read.All")
                 _ok("Applications", f"{len(apps)} apps")
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
                 apps = []
+                logger.debug("Applications fetch failed", exc_info=exc)
                 _fail("Applications", str(exc))
 
             # --- Users (with signInActivity if P1+) ---
+            # P1 licensing is required for signInActivity; if that fails we
+            # transparently fall back to a plain /users listing so checks
+            # that don't need sign-in data still run.
             try:
-                raw_users = await graph.get_all_pages(
+                raw_users = await _fetch_with_select_fallback(
+                    graph,
                     "/users?$select=id,displayName,userPrincipalName,"
-                    "accountEnabled,userType,createdDateTime,signInActivity"
+                    "accountEnabled,userType,createdDateTime,signInActivity",
+                    "/users",
                 )
                 users = [User.model_validate(u) for u in raw_users]
                 granted_permissions.add("User.Read.All")
                 _ok("Users", f"{len(users)} users")
-            except Exception:
-                try:
-                    raw_users = await graph.get_all_pages("/users")
-                    users = [User.model_validate(u) for u in raw_users]
-                    granted_permissions.add("User.Read.All")
-                    _ok("Users", f"{len(users)} users, no sign-in data")
-                except Exception as exc:
-                    users = []
-                    _fail("Users", str(exc))
+            except _EXPECTED_FETCH_ERRORS as exc:
+                users = []
+                logger.debug("Users fetch failed", exc_info=exc)
+                _fail("Users", str(exc))
 
             # --- Organization ---
             org_display_name = ""
@@ -159,7 +240,8 @@ async def _fetch_and_scan(
                     if org_primary_domain:
                         detail += f" ({org_primary_domain})"
                     _ok("Organization", detail)
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
+                logger.debug("Organization fetch failed", exc_info=exc)
                 _fail("Organization", str(exc))
 
             # --- Security Defaults policy ---
@@ -170,7 +252,8 @@ async def _fetch_and_scan(
                 )
                 status = "enabled" if security_defaults.get("isEnabled") else "disabled"
                 _ok("Security defaults", status)
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
+                logger.debug("Security defaults fetch failed", exc_info=exc)
                 _fail("Security defaults", str(exc))
 
             # --- Service Principals ---
@@ -181,8 +264,9 @@ async def _fetch_and_scan(
                 ]
                 granted_permissions.add("Application.Read.All")
                 _ok("Service principals", f"{len(service_principals)} SPs")
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
                 service_principals = []
+                logger.debug("Service principals fetch failed", exc_info=exc)
                 _fail("Service principals", str(exc))
 
             # --- Directory Role Assignments ---
@@ -197,8 +281,9 @@ async def _fetch_and_scan(
                 ]
                 granted_permissions.add("RoleManagement.Read.Directory")
                 _ok("Role assignments", f"{len(role_assignments)} assignments")
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
                 role_assignments = []
+                logger.debug("Role assignments fetch failed", exc_info=exc)
                 _fail("Role assignments", str(exc))
 
             # --- Authorization Policy ---
@@ -209,7 +294,8 @@ async def _fetch_and_scan(
                 )
                 granted_permissions.add("Policy.Read.All")
                 _ok("Authorization policy")
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
+                logger.debug("Authorization policy fetch failed", exc_info=exc)
                 _fail("Authorization policy", str(exc))
 
             # --- OAuth2 Permission Grants ---
@@ -219,28 +305,25 @@ async def _fetch_and_scan(
                     "/oauth2PermissionGrants"
                 )
                 _ok("Delegated permission grants", f"{len(oauth2_grants)} grants")
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
+                logger.debug("OAuth2 grants fetch failed", exc_info=exc)
                 _fail("Delegated permission grants", str(exc))
 
             # --- App Role Assignments ---
+            # Fetched concurrently (bounded) — one request per service
+            # principal is O(N); a sequential loop dominated scan time on
+            # tenants with thousands of SPs.
             all_app_role_assignments: list[AppRoleAssignment] = []
             try:
-                for sp in service_principals:
-                    try:
-                        raw_sp_ara = await graph.get(
-                            f"/servicePrincipals/{sp.id}/appRoleAssignments"
-                        )
-                        for item in raw_sp_ara.get("value", []):
-                            all_app_role_assignments.append(
-                                AppRoleAssignment.model_validate(item)
-                            )
-                    except Exception:
-                        continue
+                all_app_role_assignments = await _fetch_sp_app_role_assignments(
+                    graph, service_principals
+                )
                 _ok(
                     "App role assignments",
                     f"{len(all_app_role_assignments)} assignments",
                 )
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
+                logger.debug("App role assignments outer fetch failed", exc_info=exc)
                 _fail("App role assignments", str(exc))
 
             # --- Authentication Methods Policy ---
@@ -251,7 +334,8 @@ async def _fetch_and_scan(
                 )
                 granted_permissions.add("Policy.Read.All")
                 _ok("Authentication methods policy")
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
+                logger.debug("Authentication methods policy fetch failed", exc_info=exc)
                 _fail("Authentication methods policy", str(exc))
 
             # --- Cross-Tenant Access Default Policy ---
@@ -262,7 +346,8 @@ async def _fetch_and_scan(
                 )
                 granted_permissions.add("Policy.Read.All")
                 _ok("Cross-tenant access policy")
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
+                logger.debug("Cross-tenant policy fetch failed", exc_info=exc)
                 _fail("Cross-tenant access policy", str(exc))
 
             # --- Named Locations ---
@@ -274,7 +359,8 @@ async def _fetch_and_scan(
                 named_locations = raw_locations.get("value", [])
                 granted_permissions.add("Policy.Read.All")
                 _ok("Named locations", f"{len(named_locations)} locations")
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
+                logger.debug("Named locations fetch failed", exc_info=exc)
                 _fail("Named locations", str(exc))
 
             # --- Agent Identity Blueprints ---
@@ -311,7 +397,8 @@ async def _fetch_and_scan(
                     "Agent identity blueprints",
                     f"{len(agent_blueprints)} blueprints",
                 )
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
+                logger.debug("Agent blueprints fetch failed", exc_info=exc)
                 _fail("Agent identity blueprints", str(exc))
 
             # --- Agent Identity Blueprint Principals ---
@@ -340,7 +427,8 @@ async def _fetch_and_scan(
                     "Agent blueprint principals",
                     f"{len(agent_bp_principals)} principals",
                 )
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
+                logger.debug("Agent blueprint principals fetch failed", exc_info=exc)
                 _fail("Agent blueprint principals", str(exc))
 
             # --- Agent Identities ---
@@ -384,7 +472,8 @@ async def _fetch_and_scan(
                     "Agent identities",
                     f"{len(agent_identities)} agents",
                 )
-            except Exception as exc:
+            except _EXPECTED_FETCH_ERRORS as exc:
+                logger.debug("Agent identities fetch failed", exc_info=exc)
                 _fail("Agent identities", str(exc))
 
         # --- Display fetch results as a compact table ---
@@ -571,7 +660,7 @@ def scan(
         )
         try:
             token = provider.acquire_token_default_credential()
-        except Exception as exc:
+        except AuthenticationError as exc:
             console.print(f"[red]DefaultAzureCredential auth failed:[/red] {exc}")
             raise typer.Exit(code=1) from None
     elif ci_secret or ci_cert:
@@ -583,7 +672,7 @@ def scan(
         )
         try:
             token = provider.acquire_token_client_credentials()
-        except Exception as exc:
+        except AuthenticationError as exc:
             console.print(f"[red]Client credentials auth failed:[/red] {exc}")
             raise typer.Exit(code=1) from None
     else:
@@ -696,10 +785,10 @@ def scan(
     # --- Stream findings to console ---
     if not suppress_console:
         # Build a set of NEW fingerprints for annotation.
+        from entralint.core.baseline import _fingerprint
+
         new_fps: set[str] = set()
         if delta:
-            from entralint.core.baseline import _fingerprint
-
             new_fps = {_fingerprint(f) for f in delta.new}
 
         for finding in findings:

@@ -74,8 +74,19 @@ def save_baseline(findings: list[Finding], path: Path | str) -> Path:
 
     Only FAIL findings are stored — PASS, SKIP, and ERROR are ignored.
     Returns the path written.
+
+    The ``path`` is resolved and its parent directory must already exist,
+    which makes obvious typos and directory-traversal style inputs fail
+    fast instead of silently writing to an unexpected location.
     """
-    path = Path(path)
+    resolved = Path(path).expanduser().resolve()
+    if not resolved.parent.exists():
+        raise ValueError(
+            f"Baseline parent directory does not exist: {resolved.parent}"
+        )
+    if resolved.exists() and not resolved.is_file():
+        raise ValueError(f"Baseline path is not a file: {resolved}")
+
     fail_findings = [f for f in findings if f.status == Status.FAIL]
 
     entries = [
@@ -94,11 +105,11 @@ def save_baseline(findings: list[Finding], path: Path | str) -> Path:
         entries=entries,
     )
 
-    path.write_text(
+    resolved.write_text(
         json.dumps(snapshot.model_dump(), indent=2),
         encoding="utf-8",
     )
-    return path
+    return resolved
 
 
 def load_baseline(path: Path | str) -> BaselineSnapshot:

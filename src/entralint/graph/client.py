@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
@@ -19,6 +21,38 @@ logger = logging.getLogger(__name__)
 
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 MAX_RETRIES = 3
+
+
+@dataclass
+class GraphMetrics:
+    """Lightweight counters to observe cache effectiveness and API load.
+
+    Exposed as :attr:`GraphClient.metrics`. Values are cumulative over the
+    lifetime of a single client. At ``--debug`` log level a summary is
+    emitted when the client closes.
+    """
+
+    cache_hits: int = 0
+    cache_misses: int = 0
+    requests_sent: int = 0
+    retries: int = 0
+    throttled: int = 0
+    elapsed_s: float = 0.0
+    by_status: dict[int, int] = field(default_factory=dict)
+
+    def record_status(self, status: int) -> None:
+        self.by_status[status] = self.by_status.get(status, 0) + 1
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "cache_hits": self.cache_hits,
+            "cache_misses": self.cache_misses,
+            "requests_sent": self.requests_sent,
+            "retries": self.retries,
+            "throttled": self.throttled,
+            "elapsed_s": round(self.elapsed_s, 3),
+            "by_status": dict(self.by_status),
+        }
 
 
 class GraphClient:
@@ -57,6 +91,7 @@ class GraphClient:
             base_url=GRAPH_BASE_URL,
             timeout=30.0,
         )
+        self.metrics = GraphMetrics()
 
     def _auth_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}"}
@@ -67,8 +102,10 @@ class GraphClient:
         if self._cache and self._tenant_id:
             cached = self._cache.get(self._tenant_id, endpoint)
             if cached is not None:
+                self.metrics.cache_hits += 1
                 logger.debug("Cache hit for %s", endpoint)
                 return cached
+            self.metrics.cache_misses += 1
 
         # In offline mode, a cache miss is fatal.
         if self._offline:
@@ -78,8 +115,12 @@ class GraphClient:
             )
 
         last_exc: Exception | None = None
+        started = time.monotonic()
 
         for attempt in range(MAX_RETRIES):
+            self.metrics.requests_sent += 1
+            if attempt > 0:
+                self.metrics.retries += 1
             try:
                 response = await self._client.get(
                     endpoint, headers=self._auth_headers(), params=params
@@ -91,8 +132,11 @@ class GraphClient:
                 await asyncio.sleep(wait)
                 continue
 
+            self.metrics.record_status(response.status_code)
+
             if response.status_code == 200:
                 data = response.json()
+                self.metrics.elapsed_s += time.monotonic() - started
                 # --- Cache write ---
                 if self._cache and self._tenant_id:
                     self._cache.put(self._tenant_id, endpoint, data)
@@ -110,6 +154,7 @@ class GraphClient:
                 )
 
             if response.status_code == 429:
+                self.metrics.throttled += 1
                 retry_after = int(response.headers.get("Retry-After", "10"))
                 if attempt < MAX_RETRIES - 1:
                     logger.warning("Throttled on %s, waiting %ds", endpoint, retry_after)
@@ -159,6 +204,8 @@ class GraphClient:
         await self._client.aclose()
         if self._cache:
             self._cache.close()
+        # Summarise usage once per client lifecycle at debug level.
+        logger.debug("Graph client metrics: %s", self.metrics.as_dict())
 
     async def __aenter__(self) -> GraphClient:
         return self

@@ -1,0 +1,33 @@
+# Pre-commit hooks for EntraLint.
+# Install: pipx install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - pydantic>=2,<3
+          - types-pyyaml>=6,<7
+        args: [--config-file=pyproject.toml]
+        # Only lint the package source (not tests/fixtures) by default —
+        # mypy over tests is noisy and slows down the commit loop.
+        files: ^src/entralint/

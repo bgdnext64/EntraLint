@@ -58,3 +58,5 @@ entralint-report-*.sarif
 entralint-report-*.pdf
 
 scan-report.json
+sample-report.html
+test-report.html
