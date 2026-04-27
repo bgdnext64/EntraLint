@@ -31,8 +31,12 @@ CACHE_DIR = Path.home() / ".entralint" / "cache"
 # (e.g. "contoso.onmicrosoft.com"). MSAL accepts both, but we reject
 # obvious typos and shell-metacharacter injection up-front so they
 # cannot produce weird cache filenames.
-_GUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
-_DOMAIN_RE = re.compile(r"^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$")
+_GUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+_DOMAIN_RE = re.compile(
+    r"^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$"
+)
 
 
 def _validate_tenant_id(tenant_id: str) -> str:

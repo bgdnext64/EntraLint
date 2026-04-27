@@ -25,7 +25,6 @@ from entralint.core.errors import (
 from entralint.graph import client as client_mod
 from entralint.graph.client import GRAPH_BASE_URL, GraphClient
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -45,7 +44,9 @@ class _ScriptedTransport(httpx.AsyncBaseTransport):
         return self._responses.pop(0)
 
 
-def _make_client(responses: list[httpx.Response], **kwargs: Any) -> tuple[GraphClient, _ScriptedTransport]:
+def _make_client(
+    responses: list[httpx.Response], **kwargs: Any
+) -> tuple[GraphClient, _ScriptedTransport]:
     """Build a GraphClient with a scripted transport and no cache by default."""
     transport = _ScriptedTransport(responses)
     kwargs.setdefault("no_cache", True)
@@ -55,7 +56,9 @@ def _make_client(responses: list[httpx.Response], **kwargs: Any) -> tuple[GraphC
     return gc, transport
 
 
-def _json_response(status_code: int, body: dict | list, headers: dict | None = None) -> httpx.Response:
+def _json_response(
+    status_code: int, body: dict | list, headers: dict | None = None
+) -> httpx.Response:
     return httpx.Response(status_code, json=body, headers=headers or {})
 
 
