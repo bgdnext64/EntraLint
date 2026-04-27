@@ -100,11 +100,11 @@ Collecting data from Microsoft Graph API...
 
 Running security checks...
 
- CRITICAL  entraid_ca_001   No CA policy requires MFA for all users
- CRITICAL  entraid_priv_002 6 permanent Global Admin assignments (max: 4)
- HIGH      entraid_app_001  12 apps with secrets expiring within 30 days
- PASS      entraid_ca_002   Legacy authentication blocked
- PASS      entraid_auth_001 Security defaults disabled (CA in use)
+ CRITICAL  entraid_ca_001    No CA policy requires MFA for all users
+ CRITICAL  entraid_role_001  6 permanent Global Admin assignments (max: 4)
+ HIGH      entraid_app_006   12 apps with secrets expiring within 30 days
+ PASS      entraid_ca_002    Legacy authentication blocked
+ PASS      entraid_auth_001  Security defaults disabled (CA in use)
 
 ╭─ Summary ────────────────────────────────────────────────────╮
 │  Passed: 48  Failed: 17  Skipped: 5                          │
@@ -136,9 +136,9 @@ EntraLint ships with 82 built-in checks organized into 9 categories:
 | Authentication | 10 | 1 Critical, 1 High, 4 Medium, 2 Low | Password protection, banned passwords, SSPR, FIDO2, Authenticator number matching, TAP lifetime |
 | Privileged Roles | 10 | 4 Critical, 3 High, 1 Medium | PIM usage, Global Admin count, standing assignments, activation approval, emergency access accounts |
 | Applications | 9 | 3 Critical, 5 High, 4 Medium | Expired/long-lived secrets, excessive Graph permissions, no owners, unrestricted user consent |
-| Service Principals | 9 | — High, Medium | Expired credentials, high-privilege grants, dual credential types, stale SPs |
+| Service Principals | 9 | 1 High, 6 Medium, 2 Low | Expired credentials, high-privilege grants, dual credential types, stale SPs |
 | Users & Guests | 9 | 1 Critical, 2 High, 3 Medium, 1 Low | Stale accounts, guest access level, MFA registration, disabled users with roles |
-| Organization | 9 | — High, Medium | Security defaults, verified domains, cross-tenant trust settings |
+| Organization | 9 | 1 High, 7 Medium, 1 Low | Security defaults, verified domains, cross-tenant trust settings |
 | Agentic Identity | 12 | 2 Critical, 4 High, 5 Medium, 1 Low | AI agent permissions, blueprint scope inheritance, blocked permission enforcement, orphaned agents, stale agents |
 
 Every check includes:
@@ -638,7 +638,7 @@ uv sync
 # Run the CLI
 uv run entralint version
 
-# Run the test suite (432 tests)
+# Run the test suite (467 tests)
 uv run pytest
 
 # Lint
@@ -767,14 +767,21 @@ The signed-in identity needs:
 
 In a demo tenant, simply being a Global Administrator is sufficient.
 
+### Prerequisites
+
+| Required for | What you need |
+|---|---|
+| All operations | PowerShell 7+ (`pwsh`), [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) signed in via `az login --tenant <demo-tenant>` |
+| `-Agent` switch | The Microsoft Graph PowerShell auth module: `Install-Module Microsoft.Graph.Authentication -Scope CurrentUser` |
+| Tier 2 / Teardown | Same as above (no extra modules) |
+
 > **Note on agent identities.** Microsoft's Agent APIs reject any token
 > that includes `Directory.AccessAsUser.All` (which `az` always requests).
 > The script handles this transparently: when `-Agent` is used, it loads
 > `Microsoft.Graph.Authentication` and connects with only the
 > `AgentIdentity.ReadWrite.All` and `Application.ReadWrite.All` scopes
 > for blueprint and agent operations, falling back to `az rest` for
-> everything else. Make sure the module is installed:
-> `Install-Module Microsoft.Graph.Authentication -Scope CurrentUser`.
+> everything else.
 
 ### Usage
 
@@ -807,7 +814,7 @@ uv run entralint scan --tenant <demo-tenant>
 # 2. Seed misconfigurations
 ./scripts/seed_demo_findings.ps1 -Tier 1 -Agent
 
-# 3. Re-scan — now shows ~15 new failures across categories
+# 3. Re-scan — typically adds 25-35 new findings depending on tier/agent flags
 uv run entralint scan --tenant <demo-tenant> --no-cache
 
 # 4. Generate a shareable HTML report from the same data
@@ -830,6 +837,10 @@ uv run entralint scan --tenant <demo-tenant> --no-cache -f html --output-file de
 - Microsoft-managed first-party service principals (e.g. Defender for
   Containers) sometimes have expired credentials and will trigger
   `entraid_sp_008`. These are out of scope for the demo script.
+- Some tenants block **B2B guest invitations** at the cross-tenant access
+  policy level (`Forbidden: Guest invitations not allowed for your
+  company`). The script logs a warning, skips that step, and continues
+  — `entraid_user_001`/`_006`/`_008` will not fire on those tenants.
 
 ## License
 
