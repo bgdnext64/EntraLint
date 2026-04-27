@@ -81,13 +81,15 @@ That's it. EntraLint authenticates via device-code flow (you'll see a URL and co
 
 ### What You'll See
 
-EntraLint prints color-coded findings as each check runs:
+EntraLint prints color-coded findings as each check runs. Here's an
+example highlighting the **Entra Agent ID** category — the newest and
+most under-tooled identity surface in Entra ID:
 
 ```
-╭─ EntraLint v0.1.0 ──────────────────────────────────────────╮
-│ Tenant: contoso.onmicrosoft.com                              │
-│ Checks: 82 | Framework: All                                  │
-╰──────────────────────────────────────────────────────────────╯
+╭─ EntraLint v0.1.0 ──────────────────────────────────────────────────────╮
+│ Tenant: contoso.onmicrosoft.com                                         │
+│ Checks: 82 | Framework: All                                             │
+╰─────────────────────────────────────────────────────────────────────────╯
 
 Collecting data from Microsoft Graph API...
   ✓ Organization settings
@@ -96,20 +98,56 @@ Collecting data from Microsoft Graph API...
   ✓ Applications (142)
   ✓ Service Principals (891)
   ✓ Role Assignments
-  ✓ Agent Identities
+  ✓ Agent Identities (7 agents, 12 blueprints)
 
 Running security checks...
 
- CRITICAL  entraid_ca_001    No CA policy requires MFA for all users
- CRITICAL  entraid_role_001  6 permanent Global Admin assignments (max: 4)
- HIGH      entraid_app_006   12 apps with secrets expiring within 30 days
- PASS      entraid_ca_002    Legacy authentication blocked
- PASS      entraid_auth_001  Security defaults disabled (CA in use)
+ CRITICAL  entraid_agent_001  Agent 'finance-bot' holds dangerous permission RoleManagement.ReadWrite.Directory
+ CRITICAL  entraid_agent_002  Blueprint 'corp-copilot-bp' uses allAllowedScopes inheritance (any permission its sponsor has)
+ HIGH      entraid_agent_003  Agent 'helpdesk-bot' holds blocked permission Files.ReadWrite.All
+ HIGH      entraid_agent_004  Agent 'data-summarizer' has overly broad scope (Mail.ReadWrite + Files.ReadWrite.All + Sites.ReadWrite.All)
+ HIGH      entraid_agent_005  Agent 'rogue-poc' created by external app 14d82eec-204b-4c2f-b7e8-296a70dab67e (not on allowlist)
+ HIGH      entraid_agent_006  Blueprint 'team-assistant-bp' has no owner or sponsor
+ MEDIUM    entraid_agent_008  Blueprint 'legacy-bot-bp' uses client secrets instead of federated credentials
+ MEDIUM    entraid_agent_010  Blueprint 'corp-copilot-bp' has no inheritable permission restrictions
+ LOW       entraid_agent_012  Blueprint 'team-assistant-bp' has no description
+ PASS      entraid_agent_007  No external agent blueprint principals found
+ PASS      entraid_agent_009  No stale agent identities (>180 days)
+ PASS      entraid_agent_011  No agent identity is disabled by Microsoft
 
-╭─ Summary ────────────────────────────────────────────────────╮
-│  Passed: 48  Failed: 17  Skipped: 5                          │
-╰──────────────────────────────────────────────────────────────╯
+ CRITICAL  entraid_ca_001     No CA policy requires MFA for all users
+ CRITICAL  entraid_role_001   6 permanent Global Admin assignments (max: 4)
+ HIGH      entraid_app_006    12 apps with secrets expiring within 30 days
+ PASS      entraid_ca_002     Legacy authentication blocked
+ PASS      entraid_auth_001   Security defaults disabled (CA in use)
+
+╭─ Summary ───────────────────────────────────────────────────────────────╮
+│  Passed: 48  Failed: 17  Skipped: 5                                     │
+╰─────────────────────────────────────────────────────────────────────────╯
 ```
+
+#### What those agent findings mean
+
+The Entra Agent ID surface is brand new — agent identities became GA in
+Microsoft Graph v1.0 in March 2026 — and most security tools haven't
+caught up yet. Here's why each line above matters:
+
+| Finding | Why it's risky |
+|---|---|
+| **`entraid_agent_001` — Dangerous permission** | An AI agent holding `RoleManagement.ReadWrite.Directory` can grant itself or anyone else any directory role, including Global Administrator. Treat agent permissions like service principal permissions: least privilege only. |
+| **`entraid_agent_002` — `allAllowedScopes` inheritance** | A blueprint configured with `allAllowedScopes` lets every agent built from it inherit *any* permission its sponsor has. This collapses RBAC: a single misconfigured sponsor user grants the entire fleet of agents broad access. |
+| **`entraid_agent_003` — Blocked permission** | The tenant's permission grant policy explicitly forbade `Files.ReadWrite.All` for agents, but this agent acquired it anyway (likely via a blueprint update before policy enforcement). Indicates a drift or policy bypass. |
+| **`entraid_agent_004` — Overly broad scope** | The agent has multiple high-impact permissions across mail, files, and SharePoint. If credentials leak or the model is prompt-injected, the blast radius is the entire user data plane. |
+| **`entraid_agent_005` — Unauthorized creator** | The agent was created by an external app registration that isn't on your allowlist. Agents created by unknown apps are an exfiltration vector — anyone with a valid Graph token from that external app could spawn agents in your tenant. |
+| **`entraid_agent_006` — No owner / sponsor** | An ownerless blueprint has no human accountable for review or revocation. When the original creator leaves, the blueprint becomes a permanent orphan. |
+| **`entraid_agent_008` — Client secrets** | Agents using long-lived client secrets are stealable; federated credentials (workload identity federation) avoid the secret entirely. |
+| **`entraid_agent_010` — No inheritable restrictions** | The blueprint doesn't define a permission ceiling, so future agents created from it can request whatever they want. Best practice is to declare the maximum permission set at the blueprint level. |
+| **`entraid_agent_012` — No description** | Audit hygiene only, but matters at scale: when a tenant has dozens of agents, "what does this one do?" needs a fast answer. |
+
+EntraLint ships **all 12** Entra Agent ID checks today, covering
+permissions, blueprint inheritance, ownership, credentials, lifecycle,
+and origin/creator. See [`uv run entralint list-checks --category AgentIdentity`](#cli-reference)
+for the full list.
 
 ### Saving Reports
 
