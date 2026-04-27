@@ -86,6 +86,7 @@ $ErrorActionPreference = 'Stop'
 $script:GraphBase = 'https://graph.microsoft.com/v1.0'
 $script:GraphBeta = 'https://graph.microsoft.com/beta'
 $script:State = $null
+$script:MgAgentConnected = $false
 
 # ---------------------------------------------------------------------------
 # Graph helpers (delegated through `az rest`)
@@ -121,6 +122,53 @@ function Get-CurrentUser {
     Invoke-Graph -Method GET -Uri "$script:GraphBase/me"
 }
 
+function Connect-MgAgentSession {
+    <#
+    .SYNOPSIS
+    Establishes a Microsoft Graph PowerShell connection with ONLY the
+    Agent ID scopes. Required because Microsoft's Agent APIs reject any
+    token that includes Directory.AccessAsUser.All (which az CLI tokens
+    always contain). Disconnects any prior session first to drop the
+    broader scope set.
+    #>
+    if ($script:MgAgentConnected) { return }
+    if (-not (Get-Module -ListAvailable -Name Microsoft.Graph.Authentication)) {
+        throw "Microsoft.Graph.Authentication module not installed. Run: Install-Module Microsoft.Graph.Authentication -Scope CurrentUser"
+    }
+    Import-Module Microsoft.Graph.Authentication -ErrorAction Stop
+    try { Disconnect-MgGraph -ErrorAction SilentlyContinue | Out-Null } catch { }
+    Connect-MgGraph -TenantId $script:TenantId -Scopes @(
+        'AgentIdentity.ReadWrite.All',
+        'Application.ReadWrite.All'
+    ) -NoWelcome -ErrorAction Stop
+    $script:MgAgentConnected = $true
+}
+
+function Invoke-MgAgent {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [ValidateSet('GET', 'POST', 'PATCH', 'PUT', 'DELETE')] [string]$Method,
+        [Parameter(Mandatory)] [string]$Uri,
+        [object]$Body,
+        [switch]$IgnoreError
+    )
+    Connect-MgAgentSession
+    try {
+        if ($null -ne $Body) {
+            $json = if ($Body -is [string]) { $Body } else { $Body | ConvertTo-Json -Depth 10 -Compress }
+            return Invoke-MgGraphRequest -Method $Method -Uri $Uri -Body $json -ContentType 'application/json' -ErrorAction Stop
+        }
+        return Invoke-MgGraphRequest -Method $Method -Uri $Uri -ErrorAction Stop
+    }
+    catch {
+        if ($IgnoreError) {
+            Write-Warning "Mg $Method $Uri failed: $_"
+            return $null
+        }
+        throw "Mg $Method $Uri failed: $_"
+    }
+}
+
 # ---------------------------------------------------------------------------
 # State persistence
 # ---------------------------------------------------------------------------
@@ -139,11 +187,19 @@ function Initialize-State {
                 applications      = @()
                 servicePrincipals = @()
                 agentBlueprints   = @()
+                agentBlueprintPrincipals = @()
                 agentIdentities   = @()
                 roleAssignments   = @()
                 groups            = @()
             }
             policies    = [pscustomobject]@{}
+        }
+    }
+    # Migrate older state files that may be missing newer object kinds.
+    foreach ($kind in @('users', 'applications', 'servicePrincipals', 'agentBlueprints',
+                        'agentBlueprintPrincipals', 'agentIdentities', 'roleAssignments', 'groups')) {
+        if (-not $script:State.objects.PSObject.Properties[$kind]) {
+            $script:State.objects | Add-Member -NotePropertyName $kind -NotePropertyValue @() -Force
         }
     }
 }
@@ -157,7 +213,7 @@ function Save-State {
 function Add-StateObject {
     param(
         [Parameter(Mandatory)][ValidateSet('users', 'applications', 'servicePrincipals',
-            'agentBlueprints', 'agentIdentities', 'roleAssignments', 'groups')]
+            'agentBlueprints', 'agentBlueprintPrincipals', 'agentIdentities', 'roleAssignments', 'groups')]
         [string]$Kind,
         [Parameter(Mandatory)][object]$Obj
     )
@@ -266,10 +322,11 @@ function Seed-NonAdminOwnerOnPrivApp {
     $userName = New-DemoName -Slug 'AppOwner'
     $upn = "$userName@$domain"
     if ($PSCmdlet.ShouldProcess($upn, 'Create non-admin user and assign as app owner')) {
+        $nick = ($userName -replace '[^A-Za-z0-9]', '')
         $userBody = @{
             accountEnabled    = $true
             displayName       = $userName
-            mailNickname      = ($userName -replace '[^A-Za-z0-9]', '').Substring(0, [Math]::Min(40, $userName.Length))
+            mailNickname      = $nick.Substring(0, [Math]::Min(40, $nick.Length))
             userPrincipalName = $upn
             passwordProfile   = @{
                 forceChangePasswordNextSignIn = $true
@@ -345,10 +402,11 @@ function Seed-DisabledMember {
     $name = New-DemoName -Slug 'DisabledUser'
     $upn = "$name@$domain"
     if ($PSCmdlet.ShouldProcess($upn, 'Create disabled member user')) {
+        $nick = ($name -replace '[^A-Za-z0-9]', '')
         $body = @{
             accountEnabled    = $false
             displayName       = $name
-            mailNickname      = ($name -replace '[^A-Za-z0-9]', '').Substring(0, [Math]::Min(40, $name.Length))
+            mailNickname      = $nick.Substring(0, [Math]::Min(40, $nick.Length))
             userPrincipalName = $upn
             passwordProfile   = @{
                 forceChangePasswordNextSignIn = $true
@@ -461,10 +519,11 @@ function Seed-Tier2 {
         $userName = New-DemoName -Slug $pair.slug
         $upn = "$userName@$domain"
         if ($PSCmdlet.ShouldProcess($upn, "Create user and assign $($pair.slug) role ($($pair.check))")) {
+            $nick = ($userName -replace '[^A-Za-z0-9]', '')
             $user = Invoke-Graph -Method POST -Uri "$script:GraphBase/users" -Body @{
                 accountEnabled    = $true
                 displayName       = $userName
-                mailNickname      = ($userName -replace '[^A-Za-z0-9]', '').Substring(0, [Math]::Min(40, $userName.Length))
+                mailNickname      = $nick.Substring(0, [Math]::Min(40, $nick.Length))
                 userPrincipalName = $upn
                 passwordProfile   = @{
                     forceChangePasswordNextSignIn = $true
@@ -482,20 +541,28 @@ function Seed-Tier2 {
 # ---------------------------------------------------------------------------
 
 function Seed-AgentIdentities {
+    # NOTE: Agent APIs reject tokens containing Directory.AccessAsUser.All
+    # (which az CLI tokens always include). We use Microsoft.Graph PowerShell
+    # with a narrow scope set instead. See Connect-MgAgentSession.
+    try { Connect-MgAgentSession } catch {
+        Write-Warning "Cannot connect to Mg with agent scopes: $_"
+        return
+    }
+
     $me = Get-CurrentUser
     $sponsorUri = "$script:GraphBase/users/$($me.id)"
 
     $blueprints = @(
-        @{ slug = 'AgentBP-Good';  body = @{ displayName = (New-DemoName 'AgentBP-Good');  description = 'Well-configured agent blueprint';  'sponsors@odata.bind' = @($sponsorUri) } },
-        @{ slug = 'AgentBP-NoDesc'; body = @{ displayName = (New-DemoName 'AgentBP-NoDesc'); 'sponsors@odata.bind' = @($sponsorUri) } },
-        @{ slug = 'AgentBP-Overpriv'; body = @{ displayName = (New-DemoName 'AgentBP-Overpriv'); description = 'Overprivileged agent blueprint'; 'sponsors@odata.bind' = @($sponsorUri) } },
-        @{ slug = 'AgentBP-Secret';  body = @{ displayName = (New-DemoName 'AgentBP-Secret');  description = 'Uses client secrets';                'sponsors@odata.bind' = @($sponsorUri) } }
+        @{ slug = 'AgentBP-Good';     body = @{ displayName = (New-DemoName 'AgentBP-Good');     description = 'Well-configured agent blueprint';   'sponsors@odata.bind' = @($sponsorUri) } },
+        @{ slug = 'AgentBP-NoDesc';   body = @{ displayName = (New-DemoName 'AgentBP-NoDesc');                                                       'sponsors@odata.bind' = @($sponsorUri) } },
+        @{ slug = 'AgentBP-Overpriv'; body = @{ displayName = (New-DemoName 'AgentBP-Overpriv'); description = 'Overprivileged agent blueprint';     'sponsors@odata.bind' = @($sponsorUri) } },
+        @{ slug = 'AgentBP-Secret';   body = @{ displayName = (New-DemoName 'AgentBP-Secret');   description = 'Uses client secrets';                'sponsors@odata.bind' = @($sponsorUri) } }
     )
 
     $created = @{}
     foreach ($bp in $blueprints) {
         if ($PSCmdlet.ShouldProcess($bp.body.displayName, 'Create agent identity blueprint')) {
-            $resp = Invoke-Graph -Method POST -Uri "$script:GraphBase/applications/microsoft.graph.agentIdentityBlueprint" -Body $bp.body -IgnoreError
+            $resp = Invoke-MgAgent -Method POST -Uri "$script:GraphBase/applications/microsoft.graph.agentIdentityBlueprint" -Body $bp.body -IgnoreError
             if ($resp -and $resp.id) {
                 Add-StateObject -Kind agentBlueprints -Obj ([pscustomobject]@{ id = $resp.id; appId = $resp.appId; displayName = $bp.body.displayName })
                 $created[$bp.slug] = $resp
@@ -506,8 +573,23 @@ function Seed-AgentIdentities {
 
     if ($created['AgentBP-Secret']) {
         if ($PSCmdlet.ShouldProcess($created['AgentBP-Secret'].id, 'Add password credential to secret-based blueprint')) {
-            Invoke-Graph -Method POST -Uri "$script:GraphBase/applications/$($created['AgentBP-Secret'].id)/addPassword" `
+            Invoke-MgAgent -Method POST -Uri "$script:GraphBase/applications/$($created['AgentBP-Secret'].id)/addPassword" `
                 -Body @{ passwordCredential = @{ displayName = 'agent-test-secret' } } -IgnoreError | Out-Null
+        }
+    }
+
+    # Each blueprint application needs a corresponding servicePrincipal
+    # ("blueprint principal") before any agentIdentity can reference it.
+    foreach ($slug in @($created.Keys)) {
+        $bp = $created[$slug]
+        if (-not $bp.appId) { continue }
+        if ($PSCmdlet.ShouldProcess($bp.appId, "Create blueprint principal for $slug")) {
+            $sp = Invoke-MgAgent -Method POST -Uri "$script:GraphBase/servicePrincipals" `
+                -Body @{ appId = $bp.appId } -IgnoreError
+            if ($sp -and $sp.id) {
+                Add-StateObject -Kind agentBlueprintPrincipals -Obj ([pscustomobject]@{ id = $sp.id; appId = $bp.appId; blueprintSlug = $slug })
+                Write-Host "  [agent] Created blueprint principal for '$slug' (sp=$($sp.id))" -ForegroundColor DarkGreen
+            }
         }
     }
 
@@ -520,7 +602,7 @@ function Seed-AgentIdentities {
         if (-not $bp) { continue }
         $name = New-DemoName -Slug $pair.slug
         if ($PSCmdlet.ShouldProcess($name, 'Create agent identity')) {
-            $resp = Invoke-Graph -Method POST -Uri "$script:GraphBase/servicePrincipals/microsoft.graph.agentIdentity" `
+            $resp = Invoke-MgAgent -Method POST -Uri "$script:GraphBase/servicePrincipals/microsoft.graph.agentIdentity" `
                 -Body @{ displayName = $name; agentIdentityBlueprintId = $bp.id; 'sponsors@odata.bind' = @($sponsorUri) } -IgnoreError
             if ($resp -and $resp.id) {
                 Add-StateObject -Kind agentIdentities -Obj ([pscustomobject]@{ id = $resp.id; displayName = $name })
@@ -536,20 +618,40 @@ function Seed-AgentIdentities {
 
 function Remove-StateObjects {
     $deletions = @(
-        @{ kind = 'roleAssignments';   uriTpl = "$script:GraphBase/roleManagement/directory/roleAssignments/{0}" },
-        @{ kind = 'agentIdentities';   uriTpl = "$script:GraphBase/servicePrincipals/{0}" },
-        @{ kind = 'agentBlueprints';   uriTpl = "$script:GraphBase/applications/{0}" },
-        @{ kind = 'servicePrincipals'; uriTpl = "$script:GraphBase/servicePrincipals/{0}" },
-        @{ kind = 'applications';      uriTpl = "$script:GraphBase/applications/{0}" },
-        @{ kind = 'users';             uriTpl = "$script:GraphBase/users/{0}" },
-        @{ kind = 'groups';            uriTpl = "$script:GraphBase/groups/{0}" }
+        @{ kind = 'roleAssignments';          uriTpl = "$script:GraphBase/roleManagement/directory/roleAssignments/{0}"; useMg = $false },
+        @{ kind = 'agentIdentities';          uriTpl = "$script:GraphBase/servicePrincipals/{0}";                        useMg = $true  },
+        # Blueprint principals (servicePrincipals for the blueprint app) cannot
+        # be deleted directly (Authorization_RequestDenied). They cascade away
+        # when the parent blueprint application is deleted, so we just clear
+        # the state entry without an HTTP call.
+        @{ kind = 'agentBlueprintPrincipals'; uriTpl = $null;                                                              useMg = $false; skipDelete = $true },
+        @{ kind = 'agentBlueprints';          uriTpl = "$script:GraphBase/applications/{0}";                             useMg = $true  },
+        @{ kind = 'servicePrincipals';        uriTpl = "$script:GraphBase/servicePrincipals/{0}";                        useMg = $false },
+        @{ kind = 'applications';             uriTpl = "$script:GraphBase/applications/{0}";                             useMg = $false },
+        @{ kind = 'users';                    uriTpl = "$script:GraphBase/users/{0}";                                    useMg = $false },
+        @{ kind = 'groups';                   uriTpl = "$script:GraphBase/groups/{0}";                                   useMg = $false }
     )
     foreach ($d in $deletions) {
-        foreach ($obj in @($script:State.objects.($d.kind))) {
+        $items = @($script:State.objects.($d.kind))
+        if ($d.skipDelete) {
+            if ($items.Count -gt 0) {
+                Write-Host "  Skipping direct delete of $($d.kind) ($($items.Count) item(s)) - cascades with parent blueprint" -ForegroundColor DarkGray
+            }
+            $script:State.objects.($d.kind) = @()
+            continue
+        }
+        if ($d.useMg -and $items.Count -gt 0) {
+            try { Connect-MgAgentSession } catch { Write-Warning "Skipping $($d.kind) deletion (Mg connect failed): $_"; continue }
+        }
+        foreach ($obj in $items) {
             if (-not $obj -or -not $obj.id) { continue }
             $uri = [string]::Format($d.uriTpl, $obj.id)
             if ($PSCmdlet.ShouldProcess($uri, "Delete $($d.kind)")) {
-                Invoke-Graph -Method DELETE -Uri $uri -IgnoreError | Out-Null
+                if ($d.useMg) {
+                    Invoke-MgAgent -Method DELETE -Uri $uri -IgnoreError | Out-Null
+                } else {
+                    Invoke-Graph -Method DELETE -Uri $uri -IgnoreError | Out-Null
+                }
                 Write-Host "  Removed $($d.kind): $($obj.id)" -ForegroundColor DarkGray
             }
         }
@@ -604,6 +706,7 @@ try {
         throw "az session is on tenant $($azCtx.tenantId) but -TenantId is $TenantId. Run 'az login --tenant $TenantId' first."
     }
     if (-not $TenantId) { $TenantId = $azCtx.tenantId }
+    $script:TenantId = $TenantId
     Write-Host "Tenant: $TenantId  ($($azCtx.user.name))" -ForegroundColor Cyan
 }
 catch {
@@ -616,16 +719,23 @@ Initialize-State
 if ($Action -eq 'Setup') {
     if ($Tier -in @('1', 'All', 'None') -and $Tier -ne 'None') {
         Write-Host "`n=== Seeding Tier 1 ===" -ForegroundColor Cyan
-        Seed-OrgPolicy
-        $hpApp = Seed-AppHighPrivPerms
-        if (-not $hpApp -and $WhatIfPreference) {
-            $hpApp = [pscustomobject]@{ id = '<whatif>'; displayName = '<whatif-app>' }
+        $tier1Steps = @(
+            { Seed-OrgPolicy },
+            { $script:hpApp = Seed-AppHighPrivPerms;
+                if (-not $script:hpApp -and $WhatIfPreference) {
+                    $script:hpApp = [pscustomobject]@{ id = '<whatif>'; displayName = '<whatif-app>' }
+                }
+            },
+            { if ($script:hpApp) { Seed-NonAdminOwnerOnPrivApp -App $script:hpApp } },
+            { Seed-AppExcessiveDelegated },
+            { Seed-DisabledSPWithCreds },
+            { Seed-DisabledMember },
+            { Seed-GuestInvites }
+        )
+        foreach ($step in $tier1Steps) {
+            try { & $step } catch { Write-Warning "Step failed (continuing): $_" }
+            Save-State
         }
-        if ($hpApp) { Seed-NonAdminOwnerOnPrivApp -App $hpApp }
-        Seed-AppExcessiveDelegated
-        Seed-DisabledSPWithCreds
-        Seed-DisabledMember
-        Seed-GuestInvites
     }
     if ($Tier -in @('2', 'All')) {
         if (Confirm-Tier2) {
@@ -638,7 +748,8 @@ if ($Action -eq 'Setup') {
     }
     if ($Agent) {
         Write-Host "`n=== Seeding Agent Identities ===" -ForegroundColor Cyan
-        Seed-AgentIdentities
+        try { Seed-AgentIdentities } catch { Write-Warning "Agent seeding failed: $_" }
+        Save-State
     }
     Save-State
     Write-Host "`nDone. State file: $StateFile" -ForegroundColor Green

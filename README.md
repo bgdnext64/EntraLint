@@ -769,10 +769,12 @@ In a demo tenant, simply being a Global Administrator is sufficient.
 
 > **Note on agent identities.** Microsoft's Agent APIs reject any token
 > that includes `Directory.AccessAsUser.All` (which `az` always requests).
-> If creation or teardown of agent identities fails with that error,
-> use `Connect-MgGraph -Scopes 'AgentIdentity.ReadWrite.All','AgentIdentityBlueprint.ReadWrite.All'`
-> to obtain a narrower token, then retry the script — or delete the
-> objects from the portal manually.
+> The script handles this transparently: when `-Agent` is used, it loads
+> `Microsoft.Graph.Authentication` and connects with only the
+> `AgentIdentity.ReadWrite.All` and `Application.ReadWrite.All` scopes
+> for blueprint and agent operations, falling back to `az rest` for
+> everything else. Make sure the module is installed:
+> `Install-Module Microsoft.Graph.Authentication -Scope CurrentUser`.
 
 ### Usage
 
