@@ -60,3 +60,10 @@ entralint-report-*.pdf
 scan-report.json
 sample-report.html
 test-report.html
+
+# Demo seeding state + scratch scan outputs
+scripts/.demo-state.json
+scan-current.json
+scan-after-clean.json
+scan-final.json
+checks.json
