@@ -679,6 +679,156 @@ src/entralint/
 └── frameworks/   # Compliance framework mappings
 ```
 
+## Demo Tenant Seeding
+
+[`scripts/seed_demo_findings.ps1`](scripts/seed_demo_findings.ps1) is a
+companion script that intentionally **"dorks"** a non-production Entra ID
+tenant so EntraLint has realistic findings to demonstrate against. It can
+also reverse every change it makes.
+
+> **Run this only against a dedicated demo or experimentation tenant.** It
+> creates real applications, service principals, users, agent identities,
+> and patches the tenant `authorizationPolicy`. Never point it at a tenant
+> that contains anything you care about.
+
+### What it seeds
+
+The script is divided into three independent groups so you can scope what
+gets created.
+
+**Tier 1 — Safe, easily reversible (default).** Triggers ~10 EntraLint
+checks across 4 categories:
+
+| Created object / change                                       | Triggers                       |
+| ------------------------------------------------------------- | ------------------------------ |
+| App registration declaring `RoleManagement.ReadWrite.Directory`, `Application.ReadWrite.All`, `Directory.ReadWrite.All` | `entraid_app_005` (HIGH)       |
+| Same app + a non-admin user added as owner                    | `entraid_app_007` (CRITICAL)   |
+| App requesting many delegated scopes (`Files.ReadWrite.All`, `Mail.ReadWrite`, `Group.ReadWrite.All`, `Directory.AccessAsUser.All`) | `entraid_app_009` (MEDIUM) |
+| Disabled service principal that still has a password credential and a self-signed cert | `entraid_sp_001` (HIGH), `entraid_sp_009` (LOW) |
+| Disabled member account                                       | `entraid_user_002` (LOW)       |
+| 3 invited guest users (to `*@example.com`)                    | `entraid_user_001`, `_006`, `_008` |
+| `authorizationPolicy` patched: `allowInvitesFrom = everyone`, `allowedToCreateApps = true`, broad user-consent permission grant policy | `entraid_org_002` (HIGH), `_003` (MEDIUM), `_009` (MEDIUM) |
+
+**Tier 2 — Privileged role assignments (opt-in, requires confirmation).**
+
+| Created object / change                                       | Triggers                       |
+| ------------------------------------------------------------- | ------------------------------ |
+| Guest user assigned `Directory Reader`                        | `entraid_role_004` (CRITICAL)  |
+| Service principal assigned `Directory Reader`                 | `entraid_role_005` (CRITICAL)  |
+| Member user assigned `Application Administrator`              | `entraid_role_009` (MEDIUM)    |
+| Member user assigned `Cloud Application Administrator`        | `entraid_role_010` (MEDIUM)    |
+
+**Agent identities — `-Agent` switch (independent of tier).** Mirrors
+the manual [`scripts/create_test_agents.ps1`](scripts/create_test_agents.ps1)
+but tagged for teardown:
+
+- 4 agent identity blueprints: well-formed / no-description / overprivileged / secret-based
+- 3 agent identities (one per non-secret blueprint)
+
+These trigger `entraid_agent_005`, `_008`, `_010`, `_012`.
+
+### How safety works
+
+1. **Naming prefix.** Every created object has a configurable display-name
+   prefix (default `EntraLint-Demo-`) and a timestamp suffix.
+2. **State file.** The script writes `scripts/.demo-state.json` recording
+   the GUID of every object it creates and a snapshot of any policy it
+   modified before mutation.
+3. **Teardown reads only the state file.** It never blanket-deletes by
+   prefix or by name — it deletes exactly the GUIDs it recorded.
+   Re-running a teardown after teardown is a no-op.
+4. **Policy snapshots.** When it patches `authorizationPolicy`, the
+   pre-patch values are captured into the state file. Teardown PATCHes
+   the original values back.
+5. **`-WhatIf` and `ShouldProcess`.** Every Graph mutation goes through
+   PowerShell's `ShouldProcess`, so `-WhatIf` enumerates exactly what
+   would happen without calling Graph. Tier 2 and Teardown additionally
+   require interactive confirmation (`-Force` to skip).
+6. **Tenant guard.** The script reads `az account show` and refuses to
+   run if the active session's tenant doesn't match `-TenantId` (when
+   provided), preventing accidental cross-tenant runs.
+
+### Authentication
+
+The script uses your existing `az` CLI session. Sign in first to the
+target tenant:
+
+```powershell
+az login --tenant <demo-tenant-id-or-domain>
+```
+
+The signed-in identity needs:
+
+- `Application.ReadWrite.All` (apps, SPs, agent blueprints)
+- `User.ReadWrite.All` and `User.Invite.All` (users + guests)
+- `Policy.ReadWrite.Authorization` (org policy)
+- `RoleManagement.ReadWrite.Directory` (Tier 2 only)
+- `AgentIdentity.ReadWrite.All` and `AgentIdentityBlueprint.ReadWrite.All` (`-Agent` only)
+
+In a demo tenant, simply being a Global Administrator is sufficient.
+
+> **Note on agent identities.** Microsoft's Agent APIs reject any token
+> that includes `Directory.AccessAsUser.All` (which `az` always requests).
+> If creation or teardown of agent identities fails with that error,
+> use `Connect-MgGraph -Scopes 'AgentIdentity.ReadWrite.All','AgentIdentityBlueprint.ReadWrite.All'`
+> to obtain a narrower token, then retry the script — or delete the
+> objects from the portal manually.
+
+### Usage
+
+```powershell
+# Dry-run everything — prints what would be created without calling Graph
+./scripts/seed_demo_findings.ps1 -Tier All -Agent -WhatIf
+
+# Default Tier 1 only
+./scripts/seed_demo_findings.ps1
+
+# Tier 1 + agent identities
+./scripts/seed_demo_findings.ps1 -Tier 1 -Agent
+
+# Add Tier 2 later (will prompt for confirmation; -Force to skip)
+./scripts/seed_demo_findings.ps1 -Tier 2
+
+# Reverse everything recorded in the state file
+./scripts/seed_demo_findings.ps1 -Action Teardown
+
+# Custom prefix / state file (rare)
+./scripts/seed_demo_findings.ps1 -Prefix 'MyCo-Lint-' -StateFile ./demo.json
+```
+
+### Demo workflow
+
+```powershell
+# 1. Baseline scan — should be mostly green on a fresh tenant
+uv run entralint scan --tenant <demo-tenant>
+
+# 2. Seed misconfigurations
+./scripts/seed_demo_findings.ps1 -Tier 1 -Agent
+
+# 3. Re-scan — now shows ~15 new failures across categories
+uv run entralint scan --tenant <demo-tenant> --no-cache
+
+# 4. Generate a shareable HTML report from the same data
+uv run entralint scan --tenant <demo-tenant> --no-cache -f html --output-file demo.html
+
+# 5. Tear it all down when finished
+./scripts/seed_demo_findings.ps1 -Action Teardown
+```
+
+### Limitations
+
+- Findings that depend on **tenant-wide policy state** that requires Entra
+  ID **P1/P2** (Conditional Access, Identity Protection, sign-in risk)
+  cannot be seeded by this script and will continue to surface as
+  pre-existing findings (or be skipped with a permission notice).
+- The script does not seed `entraid_role_001` (extra Global Admins) or
+  `entraid_sp_003` (admin-consent of high-priv permissions) even in
+  Tier 2 — these are intentionally omitted because they are easy to
+  forget to remove and have a real blast radius.
+- Microsoft-managed first-party service principals (e.g. Defender for
+  Containers) sometimes have expired credentials and will trigger
+  `entraid_sp_008`. These are out of scope for the demo script.
+
 ## License
 
 AGPL-3.0 — See [LICENSE](LICENSE) for details.
