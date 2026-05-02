@@ -68,3 +68,12 @@ scan-after-clean.json
 scan-final.json
 checks.json
 scan-seeded.json
+demo.html
+
+# Generated tenant-specific artifacts in the repo root (may contain real
+# app IDs, display names, or user GUIDs from scans). Always keep these
+# untracked to prevent accidental tenant data leaks.
+/scan-*.json
+/*-report.html
+/*-report.json
+/*.sarif
