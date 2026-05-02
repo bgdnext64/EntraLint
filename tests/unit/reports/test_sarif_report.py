@@ -89,11 +89,14 @@ def test_sarif_logical_location():
     assert loc["kind"] == "ConditionalAccessPolicy"
 
 
-def test_sarif_remediation_fix():
+def test_sarif_remediation_in_message():
     sarif = json.loads(format_sarif([_finding(remediation="Apply MFA")]))
     result = sarif["runs"][0]["results"][0]
-    assert len(result["fixes"]) == 1
-    assert result["fixes"][0]["description"]["text"] == "Apply MFA"
+    # Remediation is appended to the message text (SARIF "fixes" requires
+    # artifactChanges, which doesn't apply to config findings, so we inline
+    # the recommendation into the message instead).
+    assert "Apply MFA" in result["message"]["text"]
+    assert "fixes" not in result
 
 
 def test_sarif_skipped_level_none():

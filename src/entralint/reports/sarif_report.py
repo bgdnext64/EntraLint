@@ -121,10 +121,14 @@ def _build_result(finding: Finding, rule_id: str) -> dict[str, Any]:
     ):
         level = "none"
 
+    message_text = finding.description or finding.title
+    if finding.remediation:
+        message_text = f"{message_text}\n\nRemediation: {finding.remediation}"
+
     result: dict[str, Any] = {
         "ruleId": rule_id,
         "level": level,
-        "message": {"text": finding.description or finding.title},
+        "message": {"text": message_text},
         "locations": [
             {
                 "logicalLocations": [
@@ -136,12 +140,5 @@ def _build_result(finding: Finding, rule_id: str) -> dict[str, Any]:
             }
         ],
     }
-
-    if finding.remediation:
-        result["fixes"] = [
-            {
-                "description": {"text": finding.remediation},
-            }
-        ]
 
     return result

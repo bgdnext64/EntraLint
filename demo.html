@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EntraLint Security Report</title>
+<style>
+  :root {
+    --azure: #0078d4; --azure-dark: #005a9e; --azure-light: #deecf9;
+    --bg: #f3f2f1; --surface: #ffffff; --surface-hover: #faf9f8;
+    --text: #323130; --text-secondary: #605e5c; --text-light: #a19f9d;
+    --border: #edebe9; --border-strong: #d2d0ce;
+    --critical: #d13438; --critical-bg: #fde7e9;
+    --high: #ca5010; --high-bg: #fff4ce;
+    --medium: #8a8886; --medium-bg: #f3f2f1;
+    --low: #0078d4; --low-bg: #deecf9;
+    --pass: #107c10; --pass-bg: #dff6dd;
+    --skip: #8a8886;
+    --radius: 4px; --shadow: 0 1.6px 3.6px 0 rgba(0,0,0,.132), 0 0.3px 0.9px 0 rgba(0,0,0,.108);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Top bar */
+  .topbar {
+    background: var(--azure); color: #fff; padding: 0 2rem;
+    height: 48px; display: flex; align-items: center; gap: 1.5rem;
+  }
+  .topbar h1 {
+    font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; margin-right: 1rem;
+  }
+  .topbar h1 span { font-weight: 400; opacity: 0.85; }
+
+  /* Tab navigation */
+  .tab-nav { display: flex; gap: 0; height: 100%; }
+  .tab-btn {
+    background: none; border: none; color: rgba(255,255,255,0.75); font-family: inherit;
+    font-size: 0.8125rem; font-weight: 600; padding: 0 1rem; cursor: pointer;
+    height: 48px; display: flex; align-items: center; position: relative;
+    transition: color 0.15s;
+  }
+  .tab-btn:hover { color: #fff; }
+  .tab-btn.active { color: #fff; }
+  .tab-btn.active::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+    height: 3px; background: #fff; border-radius: 2px 2px 0 0;
+  }
+
+  /* Tab panels */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Page layout */
+  .page { max-width: 1360px; margin: 0 auto; padding: 1.5rem 2rem 3rem 2rem; }
+
+  /* Breadcrumb-style subtitle */
+  .subtitle {
+    font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1.25rem;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .subtitle .sep { color: var(--text-light); }
+
+  /* Summary cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .card {
+    background: var(--surface); border-radius: var(--radius); padding: 1.25rem 1.5rem;
+    box-shadow: var(--shadow); border-top: 3px solid var(--border);
+  }
+  .card .value { font-size: 2.25rem; font-weight: 600; color: var(--text); line-height: 1.1; }
+  .card .label { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.375rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+  .card.failed { border-top-color: var(--critical); }
+  .card.failed .value { color: var(--critical); }
+  .card.passed { border-top-color: var(--pass); }
+  .card.passed .value { color: var(--pass); }
+  .card.skipped { border-top-color: var(--skip); }
+  .card.skipped .value { color: var(--skip); }
+  .card.total { border-top-color: var(--azure); }
+  .card.total .value { color: var(--azure); }
+
+  /* Charts row */
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+  .chart-box {
+    background: var(--surface); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 1.5rem;
+  }
+  .chart-box h3 {
+    font-size: 0.875rem; font-weight: 600; color: var(--text);
+    margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);
+  }
+  .donut-wrap { display: flex; align-items: center; justify-content: center; gap: 2.5rem; }
+  .legend { display: flex; flex-direction: column; gap: 0.625rem; }
+  .legend-item { display: flex; align-items: center; gap: 0.625rem; font-size: 0.8125rem; color: var(--text); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .legend-count { font-weight: 600; min-width: 1.5rem; }
+
+  /* Category bars */
+  .bar-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .bar-row { display: flex; align-items: center; gap: 0.75rem; }
+  .bar-label { width: 100px; font-size: 0.8125rem; text-align: right; color: var(--text-secondary); text-transform: capitalize; font-weight: 600; }
+  .bar-track { flex: 1; height: 28px; background: var(--bg); border-radius: var(--radius); overflow: hidden; }
+  .bar-fill {
+    height: 100%; border-radius: var(--radius); transition: width 0.4s ease;
+    display: flex; align-items: center; padding-left: 10px;
+    font-size: 0.75rem; font-weight: 600; color: #fff; min-width: fit-content;
+  }
+
+  /* Toolbar / Filters */
+  .toolbar {
+    background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 0.875rem 1.25rem; margin-bottom: 1rem;
+    display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;
+  }
+  .toolbar label { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+  .toolbar select, .toolbar input[type="text"] {
+    background: var(--surface); color: var(--text); border: 1px solid var(--border-strong);
+    border-radius: var(--radius); padding: 6px 10px; font-size: 0.8125rem;
+    font-family: inherit; outline: none; transition: border-color 0.15s;
+  }
+  .toolbar select:focus, .toolbar input:focus { border-color: var(--azure); box-shadow: 0 0 0 1px var(--azure); }
+  .toolbar input[type="text"] { width: 240px; }
+  .toolbar .filter-group { display: flex; align-items: center; gap: 0.375rem; }
+  .result-count { font-size: 0.8125rem; color: var(--text-secondary); margin-left: auto; }
+
+  /* Findings table */
+  .table-wrap {
+    background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .findings-table { width: 100%; border-collapse: collapse; }
+  .findings-table th {
+    text-align: left; padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600;
+    color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;
+    background: var(--surface-hover); border-bottom: 1px solid var(--border-strong);
+    cursor: pointer; user-select: none; transition: color 0.15s;
+  }
+  .findings-table th:hover { color: var(--azure); }
+  .findings-table th .sort-icon { font-size: 0.625rem; margin-left: 0.25rem; opacity: 0.4; }
+  .findings-table td {
+    padding: 0.625rem 1rem; border-bottom: 1px solid var(--border);
+    font-size: 0.8125rem; vertical-align: middle;
+  }
+  .findings-table tr.finding-row { cursor: pointer; transition: background 0.1s; }
+  .findings-table tr.finding-row:hover { background: var(--surface-hover); }
+
+  /* Severity badges */
+  .sev-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 2px;
+    font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;
+  }
+  .sev-CRITICAL { background: var(--critical-bg); color: var(--critical); }
+  .sev-HIGH { background: var(--high-bg); color: var(--high); }
+  .sev-MEDIUM { background: var(--medium-bg); color: var(--text-secondary); }
+  .sev-LOW { background: var(--low-bg); color: var(--low); }
+
+  /* Status colors */
+  .status-PASS { color: var(--pass); font-weight: 600; }
+  .status-FAIL { color: var(--critical); font-weight: 600; }
+  .status-SKIP { color: var(--skip); }
+  .status-ERROR { color: var(--critical); font-weight: 700; }
+
+  /* Detail row */
+  .detail-row { display: none; }
+  .detail-row.open { display: table-row; }
+  .detail-cell {
+    padding: 1.25rem 1rem 1.5rem 3rem; background: var(--surface-hover);
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .detail-cell h4 {
+    font-size: 0.6875rem; font-weight: 600; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin: 1rem 0 0.375rem 0;
+  }
+  .detail-cell h4:first-child { margin-top: 0; }
+  .detail-cell p { font-size: 0.8125rem; color: var(--text); margin-bottom: 0.25rem; line-height: 1.6; }
+  .detail-cell a { color: var(--azure); text-decoration: none; }
+  .detail-cell a:hover { text-decoration: underline; }
+  .fw-tag {
+    display: inline-block; background: var(--azure-light); color: var(--azure-dark);
+    border-radius: 2px; padding: 2px 8px; font-size: 0.6875rem; font-weight: 600;
+    margin: 3px 4px 3px 0;
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border-strong);
+    font-size: 0.75rem; color: var(--text-light); text-align: center;
+  }
+  footer strong { color: var(--text-secondary); font-weight: 600; }
+
+  /* Guide page */
+  .guide { max-width: 820px; }
+  .guide h2 {
+    font-size: 1.375rem; font-weight: 600; color: var(--text); margin: 2rem 0 0.75rem 0;
+    padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+  }
+  .guide h2:first-child { margin-top: 0; }
+  .guide h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1.5rem 0 0.5rem 0; }
+  .guide p { font-size: 0.875rem; color: var(--text); line-height: 1.7; margin-bottom: 0.75rem; }
+  .guide ul, .guide ol { font-size: 0.875rem; color: var(--text); line-height: 1.7; margin: 0 0 0.75rem 1.5rem; }
+  .guide li { margin-bottom: 0.375rem; }
+  .guide code {
+    font-family: Consolas, 'Courier New', monospace; font-size: 0.8125rem;
+    background: var(--bg); padding: 2px 6px; border-radius: 3px; color: var(--azure-dark);
+  }
+  .guide pre {
+    background: #1e1e1e; color: #d4d4d4; border-radius: var(--radius);
+    padding: 1rem 1.25rem; overflow-x: auto; margin: 0.5rem 0 1rem 0;
+    font-family: Consolas, 'Courier New', monospace; font-size: 0.8125rem; line-height: 1.6;
+  }
+  .guide .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin: 0.75rem 0 1.25rem 0; }
+  .guide .info-card {
+    background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 1rem 1.25rem; border-left: 3px solid var(--azure);
+  }
+  .guide .info-card.warn { border-left-color: var(--high); }
+  .guide .info-card.ok { border-left-color: var(--pass); }
+  .guide .info-card h4 { font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .guide .info-card p { font-size: 0.8125rem; margin: 0; color: var(--text-secondary); }
+  .guide .check-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1.25rem 0; }
+  .guide .check-table th {
+    text-align: left; padding: 0.5rem 0.75rem; font-size: 0.75rem; font-weight: 600;
+    color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;
+    background: var(--surface-hover); border-bottom: 1px solid var(--border-strong);
+  }
+  .guide .check-table td {
+    padding: 0.5rem 0.75rem; font-size: 0.8125rem; border-bottom: 1px solid var(--border);
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .page { padding: 1rem; }
+    .charts { grid-template-columns: 1fr; }
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .donut-wrap { flex-direction: column; gap: 1.25rem; }
+    .toolbar input[type="text"] { width: 100%; }
+  }
+  @media (max-width: 600px) {
+    .topbar { padding: 0 1rem; }
+    .cards { grid-template-columns: 1fr 1fr; }
+    .findings-table td, .findings-table th { padding: 0.5rem 0.625rem; font-size: 0.75rem; }
+  }
+
+  /* Print */
+  @media print {
+    body { background: #fff; }
+    .topbar { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .tab-nav { display: none; }
+    .toolbar { display: none; }
+    .card, .chart-box, .table-wrap { box-shadow: none; border: 1px solid #d2d0ce; }
+    .detail-row.open { display: table-row; }
+    .tab-panel { display: block !important; }
+    #tab-guide { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Azure-style top bar with tabs -->
+<div class="topbar">
+  <h1>EntraLint</h1>
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="results">Results</button>
+    <button class="tab-btn" data-tab="guide">Guide</button>
+  </nav>
+</div>
+
+<!-- === RESULTS TAB === -->
+<div class="tab-panel active" id="tab-results">
+<div class="page">
+
+<!-- Subtitle / metadata -->
+<div class="subtitle">
+  <span>Tenant: <strong>Default Directory (bgdnextoutlook.onmicrosoft.com)</strong></span>
+  <span class="sep">&middot;</span>
+  <span>2026-04-27T15:08:02.025881+00:00</span>
+  <span class="sep">&middot;</span>
+  <span>EntraLint v0.1.0</span>
+</div>
+
+<!-- Summary cards -->
+<div class="cards">
+  <div class="card total"><div class="value">105</div><div class="label">Total Checks</div></div>
+  <div class="card failed"><div class="value">58</div><div class="label">Failed</div></div>
+  <div class="card passed"><div class="value">40</div><div class="label">Passed</div></div>
+  <div class="card skipped"><div class="value">7</div><div class="label">Skipped</div></div>
+  <div class="card" style="display:none;border-top-color:var(--critical)"><div class="value" style="color:var(--critical)">0</div><div class="label">Errors</div></div>
+</div>
+
+<!-- Charts -->
+<div class="charts">
+  <div class="chart-box">
+    <h3>Severity Distribution</h3>
+    <div class="donut-wrap">
+      <svg id="donut" width="150" height="150" viewBox="0 0 36 36"></svg>
+      <div class="legend" id="sev-legend"></div>
+    </div>
+  </div>
+  <div class="chart-box">
+    <h3>Failures by Category</h3>
+    <div class="bar-list" id="cat-bars"></div>
+  </div>
+</div>
+
+<!-- Filters toolbar -->
+<div class="toolbar">
+  <div class="filter-group">
+    <label>Status</label>
+    <select id="filter-status">
+      <option value="all">All</option>
+      <option value="FAIL" selected>Failed</option>
+      <option value="PASS">Passed</option>
+      <option value="SKIP">Skipped</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Severity</label>
+    <select id="filter-sev">
+      <option value="all">All</option>
+      <option value="CRITICAL">Critical</option>
+      <option value="HIGH">High</option>
+      <option value="MEDIUM">Medium</option>
+      <option value="LOW">Low</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Search</label>
+    <input type="text" id="filter-search" placeholder="Filter by check ID, title..." />
+  </div>
+  <span class="result-count" id="result-count"></span>
+</div>
+
+<!-- Findings table -->
+<div class="table-wrap">
+<table class="findings-table">
+  <thead>
+    <tr>
+      <th data-sort="severity" style="width:105px">Severity <span class="sort-icon">&#9650;&#9660;</span></th>
+      <th data-sort="status" style="width:75px">Status</th>
+      <th data-sort="check_id" style="width:185px">Check ID</th>
+      <th data-sort="title">Title</th>
+      <th data-sort="resource_id">Resource</th>
+    </tr>
+  </thead>
+  <tbody id="findings-body"></tbody>
+</table>
+</div>
+
+<footer>
+  Generated by <strong>EntraLint v0.1.0</strong> &mdash; Open-source Entra ID security linter
+</footer>
+
+</div><!-- .page -->
+</div><!-- #tab-results -->
+
+<!-- === GUIDE TAB === -->
+<div class="tab-panel" id="tab-guide">
+<div class="page guide">
+
+<h2>What is EntraLint?</h2>
+<p>EntraLint is an open-source security linter for <strong>Microsoft Entra ID</strong> (formerly Azure Active Directory). It reads your tenant configuration through the Microsoft Graph API, checks it against security best practices and compliance benchmarks, and reports exactly what needs to be fixed.</p>
+<p>Think of it as ESLint or Ruff, but for your identity configuration instead of your code.</p>
+
+<div class="card-grid">
+  <div class="info-card"><h4>82 Security Checks</h4><p>Covering 9 categories from Conditional Access to AI Agent Identities</p></div>
+  <div class="info-card"><h4>Compliance Mapping</h4><p>CIS Microsoft 365 v5, CISA SCuBA (BOD 25-01), NIST 800-53</p></div>
+  <div class="info-card ok"><h4>Read-Only Access</h4><p>EntraLint never modifies your tenant &mdash; it only reads configuration data</p></div>
+  <div class="info-card warn"><h4>CI/CD Ready</h4><p>SARIF output for GitHub Code Scanning, exit codes for pipeline gates</p></div>
+</div>
+
+<h2>Reading This Report</h2>
+
+<h3>Summary Cards</h3>
+<p>The cards at the top show an overview of your scan. <strong>Failed</strong> means a misconfiguration was detected. <strong>Passed</strong> means the check found no issues. <strong>Skipped</strong> means EntraLint could not run the check &mdash; usually because of missing API permissions or a license requirement (e.g., Entra ID P1 or P2).</p>
+
+<h3>Severity Levels</h3>
+<div class="card-grid">
+  <div class="info-card" style="border-left-color:#d13438"><h4>Critical</h4><p>Immediate risk. Direct path to account takeover or tenant compromise. Fix first.</p></div>
+  <div class="info-card" style="border-left-color:#ca5010"><h4>High</h4><p>Significant risk that could be exploited with moderate effort. Fix soon.</p></div>
+  <div class="info-card" style="border-left-color:#8a8886"><h4>Medium</h4><p>Defense-in-depth gap or hygiene issue. Plan remediation.</p></div>
+  <div class="info-card" style="border-left-color:#0078d4"><h4>Low</h4><p>Governance or documentation gap. Address during regular reviews.</p></div>
+</div>
+
+<h3>Findings Table</h3>
+<p>Click any row to expand it and see the full description, risk explanation, remediation steps, and compliance framework mappings. Use the filters above the table to narrow results by status, severity, or keyword.</p>
+
+<h2>Security Check Categories</h2>
+<table class="check-table">
+  <thead><tr><th>Category</th><th>Checks</th><th>What It Covers</th></tr></thead>
+  <tbody>
+    <tr><td>Conditional Access</td><td>14</td><td>MFA enforcement, legacy auth blocking, device compliance, sign-in/user risk policies, device code flow</td></tr>
+    <tr><td>Authentication</td><td>10</td><td>Password protection, banned passwords, SSPR, FIDO2, Authenticator settings, TAP lifetime</td></tr>
+    <tr><td>Privileged Roles</td><td>10</td><td>PIM usage, Global Admin count, standing assignments, activation approval, emergency access</td></tr>
+    <tr><td>Applications</td><td>9</td><td>Expired/long-lived secrets, excessive Graph permissions, missing owners, unrestricted consent</td></tr>
+    <tr><td>Service Principals</td><td>9</td><td>Expired credentials, high-privilege grants, dual credential types, stale service principals</td></tr>
+    <tr><td>Users &amp; Guests</td><td>9</td><td>Stale accounts, guest access level, MFA registration, disabled users with active roles</td></tr>
+    <tr><td>Organization</td><td>9</td><td>Security defaults, verified domains, cross-tenant trust settings</td></tr>
+    <tr><td>Agentic Identity</td><td>12</td><td>AI agent permissions, blueprint scope inheritance, blocked permission enforcement, orphaned/stale agents</td></tr>
+  </tbody>
+</table>
+
+<h2>Agentic Identity Checks</h2>
+<p>EntraLint is the first security scanner to provide dedicated checks for <strong>Microsoft Entra Agent ID</strong> &mdash; the GA platform (March 2026) that gives AI agents their own first-class identity type. These 12 checks cover:</p>
+<ul>
+  <li>Agents holding dangerous or blocked permissions (e.g., <code>Files.ReadWrite.All</code>, <code>RoleManagement.ReadWrite.Directory</code>)</li>
+  <li>Blueprints using <code>allAllowedScopes</code> inheritance (agents inherit any permission)</li>
+  <li>Orphaned agents with no owner or sponsor</li>
+  <li>Stale agent identities with valid credentials</li>
+  <li>External (third-party) agent blueprints operating in your tenant</li>
+  <li>Agents using client secrets instead of federated credentials</li>
+</ul>
+
+<h2>Understanding Skipped Checks</h2>
+<p>A <strong>skipped</strong> check is not a failure &mdash; it means EntraLint could not evaluate the check due to an external constraint:</p>
+<ul>
+  <li><strong>Missing permission</strong> &mdash; The service principal or user account used for the scan does not have the required Graph API permission. Grant the permission and re-scan.</li>
+  <li><strong>Missing license</strong> &mdash; The check requires an Entra ID P1 or P2 feature (e.g., sign-in logs, Identity Protection). Upgrade or suppress the check.</li>
+  <li><strong>Dependency</strong> &mdash; A prerequisite check failed, making this check irrelevant until the prerequisite is fixed.</li>
+</ul>
+
+<h2>Required Permissions</h2>
+<p>EntraLint needs <strong>read-only</strong> access to your tenant. It requires these Microsoft Graph API permissions:</p>
+<table class="check-table">
+  <thead><tr><th>Permission</th><th>What It Reads</th></tr></thead>
+  <tbody>
+    <tr><td><code>Directory.Read.All</code></td><td>Users, groups, service principals, organization config</td></tr>
+    <tr><td><code>Policy.Read.All</code></td><td>Conditional Access policies, auth methods, authorization policy</td></tr>
+    <tr><td><code>Application.Read.All</code></td><td>App registrations, credentials</td></tr>
+    <tr><td><code>RoleManagement.Read.Directory</code></td><td>Directory role assignments</td></tr>
+    <tr><td><code>AuditLog.Read.All</code></td><td>Sign-in logs (requires Entra ID P1+)</td></tr>
+    <tr><td><code>AgentIdentity.Read.All</code></td><td>Agent identities, blueprints, blueprint principals</td></tr>
+  </tbody>
+</table>
+<p style="margin-top:1rem;">Run <code>entralint permissions</code> to see the full list, or generate a ready-to-run grant script:</p>
+<pre>
+# Show required permissions
+entralint permissions
+
+# Generate a PowerShell grant script
+entralint permissions -f powershell --client-id YOUR_APP_ID
+
+# Generate an Azure CLI grant script
+entralint permissions -f azcli --client-id YOUR_APP_ID
+</pre>
+
+<h2>CLI Quick Reference</h2>
+<pre>
+# Install and run
+git clone https://github.com/bgdnext64/EntraLint.git
+cd EntraLint &amp;&amp; uv sync
+uv run entralint login
+uv run entralint scan
+
+# Output formats
+uv run entralint scan -f html --output-file report.html
+uv run entralint scan -f json --output-file results.json
+uv run entralint scan -f sarif --output-file results.sarif
+
+# Filter by severity
+uv run entralint scan --severity critical,high
+
+# CI/CD gate (exit non-zero on critical findings)
+uv run entralint scan --fail-on critical --quiet -f sarif --output-file results.sarif
+
+# Offline mode (scan cached data, no API calls)
+uv run entralint scan --offline
+
+# Inspect a specific check
+uv run entralint explain entraid_ca_001
+
+# Show required permissions / generate grant scripts
+uv run entralint permissions
+uv run entralint permissions -f powershell --client-id YOUR_APP_ID
+</pre>
+
+<h2>GitHub Action</h2>
+<p>EntraLint ships as a reusable GitHub Action. Add it to any workflow to scan your tenant on a schedule and see results in GitHub Code Scanning:</p>
+<pre>
+# .github/workflows/entralint.yml
+- uses: bgdnext64/EntraLint@main
+  with:
+    tenant-id: ${{ secrets.ENTRALINT_TENANT_ID }}
+    client-id: ${{ secrets.ENTRALINT_CLIENT_ID }}
+    client-secret: ${{ secrets.ENTRALINT_CLIENT_SECRET }}
+    fail-on: high
+</pre>
+<p>For non-GitHub CI, set <code>ENTRALINT_TENANT_ID</code>, <code>ENTRALINT_CLIENT_ID</code>, and <code>ENTRALINT_CLIENT_SECRET</code> as environment variables. The scan command auto-detects them.</p>
+
+<h2>Configuration</h2>
+<p>Create a <code>.entralint.yaml</code> file to customize behavior &mdash; suppress checks, override severities, set CI thresholds, or add custom check directories:</p>
+<pre>
+suppress:
+  - check_id: ca_003
+    reason: "Legacy VPN exception approved by CISO"
+
+overrides:
+  ca_001:
+    severity: critical
+
+exclude_checks:
+  - org_001
+
+fail_on: high
+baseline: .entralint-baseline.json
+</pre>
+
+<h2>Getting Help</h2>
+<p>EntraLint is open source and available at <a href="https://github.com/bgdnext64/EntraLint" style="color:var(--azure)">github.com/bgdnext64/EntraLint</a>. File issues, contribute checks, or read the full documentation there.</p>
+
+<footer>
+  Generated by <strong>EntraLint v0.1.0</strong> &mdash; Open-source Entra ID security linter
+</footer>
+
+</div><!-- .page .guide -->
+</div><!-- #tab-guide -->
+
+<script>
+const SCAN_DATA = {"generated_at": "2026-04-27T15:08:02.025881+00:00", "tenant_id": "Default Directory (bgdnextoutlook.onmicrosoft.com)", "summary": {"total": 105, "passed": 40, "failed": 58, "skipped": 7, "errors": 0}, "severity_counts": {"CRITICAL": 6, "HIGH": 17, "MEDIUM": 32, "LOW": 3}, "category_counts": {"agent": 9, "app": 15, "auth": 4, "ca": 12, "org": 4, "role": 4, "sp": 9, "user": 1}, "findings": [{"check_id": "entraid_agent_003", "status": "PASS", "severity": "HIGH", "title": "No agents hold blocked permissions", "description": "", "remediation": "", "resource_id": "tenant-wide", "resource_type": "AgentIdentity", "frameworks": [{"framework": "NIST_800-53", "controls": ["AC-6", "AC-3"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.6.1"]}], "risk": "Blocked permissions exist because they are too dangerous for autonomous agents \u2014 including Directory.ReadWrite.All, RoleManagement.ReadWrite.Directory, and Application.ReadWrite.All. An agent holding these can escalate privileges or modify tenant-critical configuration.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/agentid-platform-overview#microsoft-graph-permissions-blocked-for-agents"}, {"check_id": "entraid_agent_002", "status": "PASS", "severity": "CRITICAL", "title": "No blueprints use allAllowedScopes inheritance", "description": "", "remediation": "", "resource_id": "tenant-wide", "resource_type": "AgentIdentityBlueprint", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.5.1"]}, {"framework": "NIST_800-53", "controls": ["AC-6"]}], "risk": "A blueprint using allAllowedScopes grants agent instances carte-blanche to inherit any permission the blueprint is authorized for. This defeats least-privilege governance and makes it impossible to predict what permissions agent instances will acquire.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentityblueprint"}, {"check_id": "entraid_agent_004", "status": "PASS", "severity": "HIGH", "title": "All agents within permission count threshold", "description": "", "remediation": "", "resource_id": "tenant-wide", "resource_type": "AgentIdentity", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.1"]}, {"framework": "NIST_800-53", "controls": ["AC-6"]}], "risk": "An agent with many application permissions has a large blast radius. If compromised, the attacker gains access to multiple resource types across the tenant.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"}, {"check_id": "entraid_agent_008", "status": "FAIL", "severity": "MEDIUM", "title": "Blueprint 'EntraLint-Demo-AgentBP-Secret-2604271101' uses client secrets", "description": "Blueprint has 1 password credential(s) and no federated identity credentials. Client secrets are less secure than federated credentials.", "remediation": "Replace client secrets with federated identity credentials (workload identity federation) or certificate-based key credentials. Remove existing password credentials after migration.", "resource_id": "40c73f30-16f3-46fd-a838-0577aa52f7df", "resource_type": "AgentIdentityBlueprint", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.4"]}, {"framework": "NIST_800-53", "controls": ["IA-5"]}], "risk": "Client secrets are less secure than federated identity credentials or certificates. Secrets can be leaked in code, logs, or configuration files. Federated credentials eliminate shared secrets entirely.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentityblueprint"}, {"check_id": "entraid_agent_001", "status": "PASS", "severity": "CRITICAL", "title": "No agent identities with dangerous permissions", "description": "", "remediation": "", "resource_id": "tenant-wide", "resource_type": "AgentIdentity", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.5"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.6.1"]}, {"framework": "NIST_800-53", "controls": ["AC-6"]}], "risk": "Agent identities with dangerous permissions can read or modify sensitive data across the entire tenant. Files.ReadWrite.All grants access to all SharePoint and OneDrive files. Directory.ReadWrite.All enables modification of all directory objects.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/agentid-platform-overview"}, {"check_id": "entraid_agent_011", "status": "PASS", "severity": "MEDIUM", "title": "No agents disabled by Microsoft", "description": "", "remediation": "", "resource_id": "tenant-wide", "resource_type": "AgentIdentity", "frameworks": [{"framework": "NIST_800-53", "controls": ["SI-4"]}], "risk": "An agent disabled by Microsoft may have been involved in suspicious or abusive activity. The underlying blueprint or application may be compromised. Other agents from the same blueprint should be reviewed.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"}, {"check_id": "entraid_agent_007", "status": "PASS", "severity": "MEDIUM", "title": "No external agent blueprint principals", "description": "", "remediation": "", "resource_id": "tenant-wide", "resource_type": "AgentIdentityBlueprintPrincipal", "frameworks": [{"framework": "NIST_800-53", "controls": ["IA-8"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.1"]}], "risk": "External agent blueprints are published by other organizations. The tenant admin has limited visibility into their code, data handling, and update lifecycle. Broad permissions on external agents multiply this risk.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentityblueprintprincipal"}, {"check_id": "entraid_agent_006", "status": "PASS", "severity": "HIGH", "title": "All agents and blueprints have owners or sponsors", "description": "", "remediation": "", "resource_id": "tenant-wide", "resource_type": "AgentIdentity", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.1"]}, {"framework": "NIST_800-53", "controls": ["AC-6(5)"]}], "risk": "Agent identities without owners or sponsors have no accountable party for their permissions, lifecycle, and security posture. Orphaned agents are invisible to governance processes.", "remediation_url": "https://learn.microsoft.com/en-us/entra/agent-id/identity-platform/agent-owners-sponsors-managers"}, {"check_id": "entraid_agent_012", "status": "FAIL", "severity": "LOW", "title": "Blueprint 'EntraLint-Demo-AgentBP-NoDesc-2604271101' has no description", "description": "Blueprint is missing both description and info (URLs). This creates a governance gap during review.", "remediation": "Add a description to the agent identity or blueprint via PATCH. Include the agent's purpose, intended scope, and contact information in the info property.", "resource_id": "a0bf5642-7633-43b8-86d5-61199b3ab2a7", "resource_type": "AgentIdentityBlueprint", "frameworks": [{"framework": "NIST_800-53", "controls": ["CM-8"]}], "risk": "Agent identities without descriptions or documentation create a governance gap. During incident response, responders cannot quickly determine the agent's purpose, owner, or intended scope.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"}, {"check_id": "entraid_agent_010", "status": "FAIL", "severity": "MEDIUM", "title": "Blueprint 'EntraLint-Demo-AgentBP-Good-2604271101' has no inheritable permission restrictions", "description": "Blueprint has no inheritablePermissions configured. There is no declared intent for what permissions agent instances should receive.", "remediation": "Configure inheritablePermissions on the blueprint with either enumeratedScopes (explicit list) or noScopes (if agents should not inherit permissions automatically).", "resource_id": "54173d5c-8db6-4d7d-bd13-9c3fd7fd753f", "resource_type": "AgentIdentityBlueprint", "frameworks": [{"framework": "NIST_800-53", "controls": ["AC-6"]}], "risk": "Blueprints without inheritable permission restrictions provide no signal about intended permission scope. This makes permissions review harder and increases the chance of over-provisioning.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/inheritablepermission"}, {"check_id": "entraid_agent_010", "status": "FAIL", "severity": "MEDIUM", "title": "Blueprint 'EntraLint-Demo-AgentBP-NoDesc-2604271101' has no inheritable permission restrictions", "description": "Blueprint has no inheritablePermissions configured. There is no declared intent for what permissions agent instances should receive.", "remediation": "Configure inheritablePermissions on the blueprint with either enumeratedScopes (explicit list) or noScopes (if agents should not inherit permissions automatically).", "resource_id": "a0bf5642-7633-43b8-86d5-61199b3ab2a7", "resource_type": "AgentIdentityBlueprint", "frameworks": [{"framework": "NIST_800-53", "controls": ["AC-6"]}], "risk": "Blueprints without inheritable permission restrictions provide no signal about intended permission scope. This makes permissions review harder and increases the chance of over-provisioning.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/inheritablepermission"}, {"check_id": "entraid_agent_010", "status": "FAIL", "severity": "MEDIUM", "title": "Blueprint 'EntraLint-Demo-AgentBP-Secret-2604271101' has no inheritable permission restrictions", "description": "Blueprint has no inheritablePermissions configured. There is no declared intent for what permissions agent instances should receive.", "remediation": "Configure inheritablePermissions on the blueprint with either enumeratedScopes (explicit list) or noScopes (if agents should not inherit permissions automatically).", "resource_id": "40c73f30-16f3-46fd-a838-0577aa52f7df", "resource_type": "AgentIdentityBlueprint", "frameworks": [{"framework": "NIST_800-53", "controls": ["AC-6"]}], "risk": "Blueprints without inheritable permission restrictions provide no signal about intended permission scope. This makes permissions review harder and increases the chance of over-provisioning.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/inheritablepermission"}, {"check_id": "entraid_agent_010", "status": "FAIL", "severity": "MEDIUM", "title": "Blueprint 'EntraLint-Demo-AgentBP-Overpriv-2604271101' has no inheritable permission restrictions", "description": "Blueprint has no inheritablePermissions configured. There is no declared intent for what permissions agent instances should receive.", "remediation": "Configure inheritablePermissions on the blueprint with either enumeratedScopes (explicit list) or noScopes (if agents should not inherit permissions automatically).", "resource_id": "b364c9bb-15cd-4871-bb0c-dac304fa0ca8", "resource_type": "AgentIdentityBlueprint", "frameworks": [{"framework": "NIST_800-53", "controls": ["AC-6"]}], "risk": "Blueprints without inheritable permission restrictions provide no signal about intended permission scope. This makes permissions review harder and increases the chance of over-provisioning.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/inheritablepermission"}, {"check_id": "entraid_agent_005", "status": "FAIL", "severity": "HIGH", "title": "Agent 'EntraLint-Demo-Agent-Good-2604271101' created by external app 14d82eec-204b-4c2f-b7e8-296a70dab67e", "description": "Agent identity was created by application '14d82eec-204b-4c2f-b7e8-296a70dab67e' which is not registered in this tenant. This may indicate self-service provisioning without admin governance.", "remediation": "Review the creating application and verify it is an approved agent provisioning tool. Restrict agent creation to authorized applications via Entra ID app management policies.", "resource_id": "93adae3e-247d-4745-8f31-f2c26ef7ac86", "resource_type": "AgentIdentity", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.5.1"]}, {"framework": "NIST_800-53", "controls": ["CM-3"]}], "risk": "Agents created by unauthorized applications bypass admin governance review. The creating application determines the initial security posture of the agent identity.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"}, {"check_id": "entraid_agent_005", "status": "FAIL", "severity": "HIGH", "title": "Agent 'EntraLint-Demo-Agent-NoDesc-2604271101' created by external app 14d82eec-204b-4c2f-b7e8-296a70dab67e", "description": "Agent identity was created by application '14d82eec-204b-4c2f-b7e8-296a70dab67e' which is not registered in this tenant. This may indicate self-service provisioning without admin governance.", "remediation": "Review the creating application and verify it is an approved agent provisioning tool. Restrict agent creation to authorized applications via Entra ID app management policies.", "resource_id": "15c38aa0-2b6c-4abd-be48-bf51472c2d3c", "resource_type": "AgentIdentity", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.5.1"]}, {"framework": "NIST_800-53", "controls": ["CM-3"]}], "risk": "Agents created by unauthorized applications bypass admin governance review. The creating application determines the initial security posture of the agent identity.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"}, {"check_id": "entraid_agent_005", "status": "FAIL", "severity": "HIGH", "title": "Agent 'EntraLint-Demo-Agent-Overpriv-2604271101' created by external app 14d82eec-204b-4c2f-b7e8-296a70dab67e", "description": "Agent identity was created by application '14d82eec-204b-4c2f-b7e8-296a70dab67e' which is not registered in this tenant. This may indicate self-service provisioning without admin governance.", "remediation": "Review the creating application and verify it is an approved agent provisioning tool. Restrict agent creation to authorized applications via Entra ID app management policies.", "resource_id": "a70575cc-fc97-4d3c-9874-7533cc71c390", "resource_type": "AgentIdentity", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.5.1"]}, {"framework": "NIST_800-53", "controls": ["CM-3"]}], "risk": "Agents created by unauthorized applications bypass admin governance review. The creating application determines the initial security posture of the agent identity.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"}, {"check_id": "entraid_agent_009", "status": "PASS", "severity": "MEDIUM", "title": "No stale agent identities detected", "description": "", "remediation": "", "resource_id": "tenant-wide", "resource_type": "AgentIdentity", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.1"]}, {"framework": "NIST_800-53", "controls": ["AC-2(3)"]}], "risk": "Stale agent identities retain their permissions and credentials even when no longer in active use. An attacker who obtains stale agent credentials gains access to all resources the agent was authorized for.", "remediation_url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"}, {"check_id": "entraid_app_008", "status": "PASS", "severity": "MEDIUM", "title": "No applications have expired credentials", "description": "All application credentials are still valid or have been cleaned up.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "Application", "frameworks": [{"framework": "NIST_800-53", "controls": ["IA-5(1)"]}], "risk": "Applications with expired credentials indicate lack of maintenance. These may be abandoned apps that still have granted permissions. Expired credentials also cause authentication failures that may lead to workarounds like overly broad permissions on replacement apps.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal#option-3-create-a-new-client-secret"}, {"check_id": "entraid_app_001", "status": "PASS", "severity": "HIGH", "title": "No expired or expiring app credentials found", "description": "All app registration credentials are valid and not expiring within the next 30 days.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.1"]}, {"framework": "NIST_800-53", "controls": ["IA-5"]}], "risk": "Expired credentials cause authentication failures and service outages. Long-lived or unmonitored secrets are a top credential theft vector \u2014 attackers extract them from code repos, config files, and compromised endpoints.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal"}, {"check_id": "entraid_app_009", "status": "PASS", "severity": "MEDIUM", "title": "No applications have excessive delegated permissions", "description": "All applications request 10 or fewer delegated scopes.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "Application", "frameworks": [{"framework": "NIST_800-53", "controls": ["AC-6"]}], "risk": "Applications requesting many delegated permissions gain broad access when a user consents. If the application is compromised or malicious, the attacker can leverage all consented scopes to access user data, mail, files, and directory information.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity-platform/permissions-consent-overview"}, {"check_id": "entraid_app_005", "status": "FAIL", "severity": "HIGH", "title": "High-privilege permissions: EntraLint-Demo-AppHighPriv-2604271100", "description": "App 'EntraLint-Demo-AppHighPriv-2604271100' requests 2 high-privilege application permission(s): Application.ReadWrite.All, RoleManagement.ReadWrite.Directory", "remediation": "Review the requested permissions for each flagged app. Remove unnecessary high-privilege permissions and replace with narrower scopes. Use application access policies to restrict mailbox access where possible.", "resource_id": "e2095559-4719-4b1e-8365-ba608cd5cba6", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.5"]}, {"framework": "NIST_800-53", "controls": ["AC-6"]}], "risk": "Apps requesting high-privilege application permissions can act tenant-wide without user context if those permissions are consented. Even if not yet granted, the declared intent signals over-scoping and violates least privilege.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity-platform/permissions-consent-overview"}, {"check_id": "entraid_app_006", "status": "FAIL", "severity": "HIGH", "title": "Long-lived secret (730d): EntraLint-Demo-DisabledSP-2604271101", "description": "", "remediation": "Rotate application secrets to expire within 180 days. Prefer certificate-based credentials or managed identities where possible.", "resource_id": "18e34c31-7610-43ea-9eec-249ae9568e59", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.2.1"]}, {"framework": "NIST_800-53", "controls": ["IA-5"]}], "risk": "Long-lived secrets increase the window of opportunity for credential theft and misuse. Secrets that are valid for years may outlive the project or team that created them.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal#option-2-create-a-new-application-secret"}, {"check_id": "entraid_app_006", "status": "FAIL", "severity": "HIGH", "title": "Long-lived secret (730d): EntraLint-Demo-AgentBP-Secret-2604271101", "description": "", "remediation": "Rotate application secrets to expire within 180 days. Prefer certificate-based credentials or managed identities where possible.", "resource_id": "40c73f30-16f3-46fd-a838-0577aa52f7df", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.2.1"]}, {"framework": "NIST_800-53", "controls": ["IA-5"]}], "risk": "Long-lived secrets increase the window of opportunity for credential theft and misuse. Secrets that are valid for years may outlive the project or team that created them.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal#option-2-create-a-new-application-secret"}, {"check_id": "entraid_app_003", "status": "PASS", "severity": "MEDIUM", "title": "No multi-tenant app registrations found", "description": "All app registrations are configured for single-tenant (AzureADMyOrg) access.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.3"]}, {"framework": "NIST_800-53", "controls": ["AC-3"]}], "risk": "Multi-tenant apps accept authentication from any Azure AD tenant. If the app does not properly validate the tenant ID, users from external organizations could access internal resources. Apps configured for personal Microsoft accounts expand the attack surface further.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity-platform/single-and-multi-tenant-apps"}, {"check_id": "entraid_app_004", "status": "FAIL", "severity": "MEDIUM", "title": "App has no owner: EntraLint-Demo-DisabledSP-2604271101", "description": "App registration 'EntraLint-Demo-DisabledSP-2604271101' (appId: cf10eaa0-ea9f-4d0a-92a1-b1e4f3a394bb) has no assigned owner. Assign an owner for accountability.", "remediation": "Assign at least one owner to each app registration. Use Entra ID access reviews to periodically verify app ownership. Remove or disable truly orphaned applications.", "resource_id": "cf10eaa0-ea9f-4d0a-92a1-b1e4f3a394bb", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.4"]}, {"framework": "NIST_800-53", "controls": ["CM-8"]}], "risk": "Without an assigned owner, there is no accountable party for credential rotation, permission reviews, or incident response. Ownerless apps often become orphaned with stale credentials and excessive permissions.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/assign-app-owners"}, {"check_id": "entraid_app_004", "status": "FAIL", "severity": "MEDIUM", "title": "App has no owner: EntraLint-Demo-AgentBP-Secret-2604271101", "description": "App registration 'EntraLint-Demo-AgentBP-Secret-2604271101' (appId: 40c73f30-16f3-46fd-a838-0577aa52f7df) has no assigned owner. Assign an owner for accountability.", "remediation": "Assign at least one owner to each app registration. Use Entra ID access reviews to periodically verify app ownership. Remove or disable truly orphaned applications.", "resource_id": "40c73f30-16f3-46fd-a838-0577aa52f7df", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.4"]}, {"framework": "NIST_800-53", "controls": ["CM-8"]}], "risk": "Without an assigned owner, there is no accountable party for credential rotation, permission reviews, or incident response. Ownerless apps often become orphaned with stale credentials and excessive permissions.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/assign-app-owners"}, {"check_id": "entraid_app_004", "status": "FAIL", "severity": "MEDIUM", "title": "App has no owner: EntraLint-Demo-AgentBP-Good-2604271101", "description": "App registration 'EntraLint-Demo-AgentBP-Good-2604271101' (appId: 54173d5c-8db6-4d7d-bd13-9c3fd7fd753f) has no assigned owner. Assign an owner for accountability.", "remediation": "Assign at least one owner to each app registration. Use Entra ID access reviews to periodically verify app ownership. Remove or disable truly orphaned applications.", "resource_id": "54173d5c-8db6-4d7d-bd13-9c3fd7fd753f", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.4"]}, {"framework": "NIST_800-53", "controls": ["CM-8"]}], "risk": "Without an assigned owner, there is no accountable party for credential rotation, permission reviews, or incident response. Ownerless apps often become orphaned with stale credentials and excessive permissions.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/assign-app-owners"}, {"check_id": "entraid_app_004", "status": "FAIL", "severity": "MEDIUM", "title": "App has no owner: EntraLint-Demo-AppDelegatedScopes-2604271100", "description": "App registration 'EntraLint-Demo-AppDelegatedScopes-2604271100' (appId: b6cb0964-b107-4382-a0a1-f201725327dd) has no assigned owner. Assign an owner for accountability.", "remediation": "Assign at least one owner to each app registration. Use Entra ID access reviews to periodically verify app ownership. Remove or disable truly orphaned applications.", "resource_id": "b6cb0964-b107-4382-a0a1-f201725327dd", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.4"]}, {"framework": "NIST_800-53", "controls": ["CM-8"]}], "risk": "Without an assigned owner, there is no accountable party for credential rotation, permission reviews, or incident response. Ownerless apps often become orphaned with stale credentials and excessive permissions.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/assign-app-owners"}, {"check_id": "entraid_app_004", "status": "FAIL", "severity": "MEDIUM", "title": "App has no owner: EntraLint", "description": "App registration 'EntraLint' (appId: 3ca20ccf-93e1-4b48-96b0-89ef36d1b893) has no assigned owner. Assign an owner for accountability.", "remediation": "Assign at least one owner to each app registration. Use Entra ID access reviews to periodically verify app ownership. Remove or disable truly orphaned applications.", "resource_id": "3ca20ccf-93e1-4b48-96b0-89ef36d1b893", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.4"]}, {"framework": "NIST_800-53", "controls": ["CM-8"]}], "risk": "Without an assigned owner, there is no accountable party for credential rotation, permission reviews, or incident response. Ownerless apps often become orphaned with stale credentials and excessive permissions.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/assign-app-owners"}, {"check_id": "entraid_app_004", "status": "FAIL", "severity": "MEDIUM", "title": "App has no owner: EntraLint MCP Server", "description": "App registration 'EntraLint MCP Server' (appId: ea1e43c5-0a4c-463a-b009-887276e94bc8) has no assigned owner. Assign an owner for accountability.", "remediation": "Assign at least one owner to each app registration. Use Entra ID access reviews to periodically verify app ownership. Remove or disable truly orphaned applications.", "resource_id": "ea1e43c5-0a4c-463a-b009-887276e94bc8", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.4"]}, {"framework": "NIST_800-53", "controls": ["CM-8"]}], "risk": "Without an assigned owner, there is no accountable party for credential rotation, permission reviews, or incident response. Ownerless apps often become orphaned with stale credentials and excessive permissions.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/assign-app-owners"}, {"check_id": "entraid_app_004", "status": "FAIL", "severity": "MEDIUM", "title": "App has no owner: EntraLint-Demo-AgentBP-NoDesc-2604271101", "description": "App registration 'EntraLint-Demo-AgentBP-NoDesc-2604271101' (appId: a0bf5642-7633-43b8-86d5-61199b3ab2a7) has no assigned owner. Assign an owner for accountability.", "remediation": "Assign at least one owner to each app registration. Use Entra ID access reviews to periodically verify app ownership. Remove or disable truly orphaned applications.", "resource_id": "a0bf5642-7633-43b8-86d5-61199b3ab2a7", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.4"]}, {"framework": "NIST_800-53", "controls": ["CM-8"]}], "risk": "Without an assigned owner, there is no accountable party for credential rotation, permission reviews, or incident response. Ownerless apps often become orphaned with stale credentials and excessive permissions.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/assign-app-owners"}, {"check_id": "entraid_app_004", "status": "FAIL", "severity": "MEDIUM", "title": "App has no owner: EntraLint-Demo-AgentBP-Overpriv-2604271101", "description": "App registration 'EntraLint-Demo-AgentBP-Overpriv-2604271101' (appId: b364c9bb-15cd-4871-bb0c-dac304fa0ca8) has no assigned owner. Assign an owner for accountability.", "remediation": "Assign at least one owner to each app registration. Use Entra ID access reviews to periodically verify app ownership. Remove or disable truly orphaned applications.", "resource_id": "b364c9bb-15cd-4871-bb0c-dac304fa0ca8", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.4"]}, {"framework": "NIST_800-53", "controls": ["CM-8"]}], "risk": "Without an assigned owner, there is no accountable party for credential rotation, permission reviews, or incident response. Ownerless apps often become orphaned with stale credentials and excessive permissions.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/assign-app-owners"}, {"check_id": "entraid_app_007", "status": "FAIL", "severity": "CRITICAL", "title": "Non-admin owns privileged app: EntraLint-Demo-AppHighPriv-2604271100", "description": "App 'EntraLint-Demo-AppHighPriv-2604271100' requests high-privilege permissions and is owned by non-admin user(s): EntraLint-Demo-AppOwner-2604271100. This creates a privilege escalation path.", "remediation": "Ensure applications with high-privilege API permissions are owned exclusively by privileged administrators. Remove non-admin owners or reduce the app's permissions to least-privilege.", "resource_id": "5c57932e-ae3b-449a-a276-8ecc5402ef6b", "resource_type": "Application", "frameworks": [{"framework": "CISA_SCuBA", "controls": ["MS.AAD.6.1"]}, {"framework": "NIST_800-53", "controls": ["AC-6(5)"]}], "risk": "This was the exact attack vector in the Midnight Blizzard breach: a non-admin user owned a test application that held dangerous permissions. The attacker compromised the non-admin user, added new credentials to the app, and escalated to full tenant compromise.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/overview-assign-app-owners"}, {"check_id": "entraid_app_002", "status": "FAIL", "severity": "MEDIUM", "title": "App uses client secrets: EntraLint-Demo-DisabledSP-2604271101", "description": "App 'EntraLint-Demo-DisabledSP-2604271101' has 1 client secret(s). Consider migrating to certificate credentials.", "remediation": "Replace client secrets with certificate credentials or workload identity federation. Remove existing client secrets after migrating to certificates.", "resource_id": "cf10eaa0-ea9f-4d0a-92a1-b1e4f3a394bb", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.2"]}, {"framework": "NIST_800-53", "controls": ["IA-5(2)"]}], "risk": "Client secrets are strings that can leak through logs, source code, environment variables, or config files. Certificates are bound to the machine and provide non-repudiation. Microsoft recommends certificates over secrets for production applications.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity-platform/certificate-credentials"}, {"check_id": "entraid_app_002", "status": "FAIL", "severity": "MEDIUM", "title": "App uses client secrets: EntraLint-Demo-AgentBP-Secret-2604271101", "description": "App 'EntraLint-Demo-AgentBP-Secret-2604271101' has 1 client secret(s). Consider migrating to certificate credentials.", "remediation": "Replace client secrets with certificate credentials or workload identity federation. Remove existing client secrets after migrating to certificates.", "resource_id": "40c73f30-16f3-46fd-a838-0577aa52f7df", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.2"]}, {"framework": "NIST_800-53", "controls": ["IA-5(2)"]}], "risk": "Client secrets are strings that can leak through logs, source code, environment variables, or config files. Certificates are bound to the machine and provide non-repudiation. Microsoft recommends certificates over secrets for production applications.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity-platform/certificate-credentials"}, {"check_id": "entraid_app_002", "status": "FAIL", "severity": "MEDIUM", "title": "App uses client secrets: EntraLint MCP Server", "description": "App 'EntraLint MCP Server' has 2 client secret(s). Consider migrating to certificate credentials.", "remediation": "Replace client secrets with certificate credentials or workload identity federation. Remove existing client secrets after migrating to certificates.", "resource_id": "ea1e43c5-0a4c-463a-b009-887276e94bc8", "resource_type": "Application", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.2"]}, {"framework": "NIST_800-53", "controls": ["IA-5(2)"]}], "risk": "Client secrets are strings that can leak through logs, source code, environment variables, or config files. Certificates are bound to the machine and provide non-repudiation. Microsoft recommends certificates over secrets for production applications.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity-platform/certificate-credentials"}, {"check_id": "entraid_auth_003", "status": "SKIPPED_PERMISSION", "severity": "HIGH", "title": "Check skipped: Ensure a custom banned password list is configured", "description": "Missing permissions: Directory.Read.All", "remediation": "", "resource_id": "", "resource_type": "AuthenticationMethodsPolicy", "frameworks": [], "risk": "Without a custom banned password list, users can set passwords containing organization names, product names, or common terms that are easy to guess in targeted attacks.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/authentication/concept-password-ban-bad"}, {"check_id": "entraid_auth_010", "status": "FAIL", "severity": "MEDIUM", "title": "Certificate-based authentication is not enabled", "description": "X.509 certificate-based authentication is not enabled. Consider enabling CBA for phishing-resistant authentication alongside FIDO2.", "remediation": "Enable X.509 certificate-based authentication in the Entra ID authentication methods policy. Configure trusted certificate authorities and certificate-to-user mapping rules.", "resource_id": "tenant-wide", "resource_type": "AuthenticationMethodsPolicy", "frameworks": [{"framework": "NIST_800-53", "controls": ["IA-2(12)"]}], "risk": "Without certificate-based authentication, the tenant lacks an enterprise-grade phishing-resistant authentication method for scenarios where FIDO2 keys are impractical (e.g., smartcard-based authentication, VPN access, legacy systems). CBA complements FIDO2 for comprehensive phishing-resistant coverage.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/authentication/how-to-certificate-based-authentication"}, {"check_id": "entraid_auth_009", "status": "FAIL", "severity": "LOW", "title": "Email OTP authentication is enabled", "description": "Email one-time passcode authentication is enabled. This method relies on the security of the guest's email account, which may lack MFA protection.", "remediation": "Consider disabling email OTP if all guest users can use Microsoft Authenticator or FIDO2. If email OTP must remain enabled for B2B scenarios, ensure guest accounts are subject to Conditional Access policies with sign-in risk evaluation.", "resource_id": "tenant-wide", "resource_type": "AuthenticationMethodsPolicy", "frameworks": [{"framework": "NIST_800-53", "controls": ["IA-2(1)"]}], "risk": "Email OTP relies on the security of the guest user's email account, which may not have MFA enabled. If the guest's email is compromised, the attacker can authenticate to your tenant. This is a weaker authentication method compared to Authenticator or FIDO2.", "remediation_url": "https://learn.microsoft.com/en-us/entra/external-id/one-time-passcode"}, {"check_id": "entraid_auth_007", "status": "PASS", "severity": "HIGH", "title": "FIDO2 security keys are enabled", "description": "FIDO2 security keys are enabled in the authentication methods policy, providing phishing-resistant MFA.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "AuthenticationMethodsPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.3.1"]}, {"framework": "NIST_800-53", "controls": ["IA-2(6)"]}], "risk": "Without FIDO2 enabled, the tenant lacks a phishing-resistant MFA option. Traditional MFA methods (SMS, phone call, even push notifications) can be bypassed by real-time phishing proxies (e.g., Evilginx). FIDO2 keys are bound to the origin and cannot be phished.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/authentication/how-to-enable-passkey-fido2"}, {"check_id": "entraid_auth_004", "status": "PASS", "severity": "MEDIUM", "title": "Number matching is enforced", "description": "Microsoft Authenticator number matching state: default", "remediation": "", "resource_id": "MicrosoftAuthenticator", "resource_type": "AuthenticationMethodsPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.3.4"]}, {"framework": "NIST_800-53", "controls": ["IA-2(6)"]}], "risk": "Without number matching, attackers can bombard users with repeated MFA push notifications (MFA fatigue/prompt bombing) until the user accidentally approves. Number matching forces the user to enter a displayed number, preventing blind approval.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/authentication/how-to-mfa-number-match"}, {"check_id": "entraid_auth_002", "status": "PASS", "severity": "LOW", "title": "Passwordless methods enabled: Fido2, MicrosoftAuthenticator", "description": "Passwordless authentication is available via: Fido2, MicrosoftAuthenticator", "remediation": "", "resource_id": "tenant-wide", "resource_type": "AuthenticationMethodsPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.3.4"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.3.3"]}], "risk": "Without passwordless methods enabled, users must rely on passwords plus traditional MFA which remain vulnerable to adversary-in-the-middle (AiTM) phishing attacks. FIDO2 and passwordless are phishing-resistant by design.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/authentication/concept-authentication-passwordless"}, {"check_id": "entraid_auth_005", "status": "FAIL", "severity": "LOW", "title": "Software OATH tokens enabled", "description": "Software OATH token authentication method is enabled. These TOTP codes are vulnerable to adversary-in-the-middle phishing attacks.", "remediation": "Disable the software OATH token authentication method and migrate users to Microsoft Authenticator (with number matching) or FIDO2 security keys.", "resource_id": "SoftwareOath", "resource_type": "AuthenticationMethodsPolicy", "frameworks": [{"framework": "NIST_800-53", "controls": ["IA-2(6)"]}], "risk": "Software OATH tokens generate time-based one-time passwords that can be phished through adversary-in-the-middle attacks. Unlike Microsoft Authenticator or FIDO2, TOTP codes can be relayed in real-time by attackers.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/authentication/concept-authentication-oath-tokens"}, {"check_id": "entraid_auth_008", "status": "PASS", "severity": "MEDIUM", "title": "TAP maximum lifetime is 480 minutes", "description": "Temporary Access Pass maximum lifetime (480 min) is within acceptable limits.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "AuthenticationMethodsPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.3.4"]}, {"framework": "NIST_800-53", "controls": ["IA-5(13)"]}], "risk": "Temporary Access Passes with excessive lifetimes remain valid for long periods, increasing the risk of credential theft and replay attacks. A stolen TAP could be used to register new MFA methods and establish persistent access.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/authentication/howto-authentication-temporary-access-pass"}, {"check_id": "entraid_auth_006", "status": "PASS", "severity": "MEDIUM", "title": "No named locations configured", "description": "No named locations exist to review.", "remediation": "", "resource_id": "tenant", "resource_type": "NamedLocation", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2.8"]}, {"framework": "NIST_800-53", "controls": ["IA-2(13)"]}], "risk": "Named locations marked as trusted can be used in CA policy conditions to skip MFA. If an attacker can route traffic through a trusted IP range (VPN compromise, BGP hijack), they bypass MFA entirely. Over-trusting locations expands the attack surface.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/location-condition"}, {"check_id": "entraid_auth_001", "status": "FAIL", "severity": "MEDIUM", "title": "Weak MFA methods enabled: Sms", "description": "The following weak authentication methods are enabled: Sms. SMS and voice calls are vulnerable to SIM-swap and SS7 interception attacks.", "remediation": "Disable SMS and voice call authentication methods in the Entra ID authentication methods policy. Migrate users to Microsoft Authenticator, FIDO2 security keys, or Windows Hello for Business.", "resource_id": "tenant-wide", "resource_type": "AuthenticationMethodsPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.3.5"]}, {"framework": "NIST_800-53", "controls": ["IA-2(6)"]}], "risk": "SMS and voice calls are the weakest MFA factors. SIM-swap attacks allow adversaries to intercept one-time codes. NIST SP 800-63B deprecated SMS as an out-of-band authenticator. Attackers routinely target SMS-based MFA in credential phishing campaigns.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/authentication/concept-authentication-methods"}, {"check_id": "entraid_ca_012", "status": "FAIL", "severity": "HIGH", "title": "No managed device requirement for admins", "description": "No enabled CA policy requires a compliant or hybrid-joined device for privileged admin roles.", "remediation": "Create a CA policy targeting admin roles that requires a compliant or hybrid Azure AD joined device.", "resource_id": "", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2.8"]}, {"framework": "NIST_800-53", "controls": ["AC-17"]}], "risk": "Without device compliance requirements, compromised admin credentials can be used from any unmanaged device, including attacker-controlled machines.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-policy-compliant-device-admin"}, {"check_id": "entraid_ca_009", "status": "FAIL", "severity": "CRITICAL", "title": "No Conditional Access policies configured", "description": "No CA policies exist at all.", "remediation": "Review report-only policies and transition critical ones (MFA, legacy auth block) to enabled state.", "resource_id": "", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.1.1"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.3.1"]}], "risk": "Report-only policies log events but do not block or challenge sign-ins. An attacker can bypass all Conditional Access protections if no policy is enforced.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-report-only"}, {"check_id": "entraid_ca_002", "status": "FAIL", "severity": "CRITICAL", "title": "Legacy authentication not blocked", "description": "No enabled Conditional Access policy blocks legacy auth protocols (Exchange ActiveSync, IMAP, POP3). These protocols bypass MFA entirely and are exploited in password spray attacks.", "remediation": "Create a Conditional Access policy that blocks access for 'Exchange ActiveSync clients' and 'Other clients' client app types for all users.", "resource_id": "tenant-wide", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2.3"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.5.1"]}, {"framework": "NIST_800-53", "controls": ["IA-2"]}], "risk": "Legacy auth protocols do not support modern authentication or MFA. Attackers use password spray attacks against these endpoints to bypass MFA enforcement.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-policy-block-legacy"}, {"check_id": "entraid_ca_005", "status": "FAIL", "severity": "HIGH", "title": "No sign-in risk policy configured", "description": "No enabled Conditional Access policy responds to high or medium sign-in risk. Suspicious sign-ins (impossible travel, anonymous IPs, credential spray) will not be automatically challenged or blocked.", "remediation": "Create a Conditional Access policy targeting All Users with sign-in risk levels set to High and Medium, requiring MFA or blocking access.", "resource_id": "tenant-wide", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2.7"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.3.4"]}, {"framework": "NIST_800-53", "controls": ["SI-4"]}], "risk": "Without sign-in risk policies, Entra ID cannot automatically respond to suspicious sign-in patterns such as impossible travel, anonymous IP addresses, or credential spray attacks detected by Identity Protection.", "remediation_url": "https://learn.microsoft.com/en-us/entra/id-protection/howto-identity-protection-configure-risk-policies"}, {"check_id": "entraid_ca_006", "status": "FAIL", "severity": "HIGH", "title": "No user risk policy configured", "description": "No enabled Conditional Access policy responds to high user risk. Accounts flagged as compromised by Identity Protection will continue to operate normally.", "remediation": "Create a Conditional Access policy targeting All Users with user risk level set to High, requiring secure password change or blocking access.", "resource_id": "tenant-wide", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2.8"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.3.5"]}, {"framework": "NIST_800-53", "controls": ["SI-4"]}], "risk": "Without user risk policies, accounts flagged as compromised by Identity Protection (leaked credentials, suspicious activity patterns) continue to operate normally, giving attackers persistent access.", "remediation_url": "https://learn.microsoft.com/en-us/entra/id-protection/howto-identity-protection-configure-risk-policies"}, {"check_id": "entraid_ca_010", "status": "FAIL", "severity": "HIGH", "title": "Device code flow not blocked", "description": "No enabled CA policy blocks the device code authentication flow, which is commonly abused in phishing attacks.", "remediation": "Create a CA policy that blocks device code flow for all users (or all except break-glass accounts) by targeting the 'Device code flow' client app type condition.", "resource_id": "", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2.12"]}], "risk": "Device code flow allows an attacker to phish users into authenticating on the attacker's device by presenting a legitimate Microsoft login page with a code. This bypasses traditional phishing protections.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-conditions#device-code-flow"}, {"check_id": "entraid_ca_011", "status": "PASS", "severity": "HIGH", "title": "No CA policies with excessive exclusions", "description": "", "remediation": "", "resource_id": "", "resource_type": "", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.1.1"]}], "risk": "Each excluded user or group is a potential bypass vector. Attackers who compromise excluded accounts are not subject to otherwise mandatory controls like MFA or device compliance.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-users-groups"}, {"check_id": "entraid_ca_013", "status": "FAIL", "severity": "HIGH", "title": "No Conditional Access policies configured", "description": "No CA policies exist, so guest/external users are not subject to any access controls.", "remediation": "Create a Conditional Access policy that targets 'GuestsOrExternalUsers' to enforce MFA, session controls, or block risky sign-ins for external identities.", "resource_id": "tenant", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.1"]}, {"framework": "CIS_M365_v5", "controls": ["5.2.2.6"]}], "risk": "If no CA policy targets guest or external users, these identities may bypass all Conditional Access protections. Attackers frequently compromise guest accounts as a lateral-movement vector into partner tenants.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-users-groups#guest-or-external-users"}, {"check_id": "entraid_ca_004", "status": "FAIL", "severity": "CRITICAL", "title": "No CA policy requires MFA for Azure Management", "description": "No enabled Conditional Access policy enforces MFA for the Azure Management portal and ARM APIs. This means compromised credentials can manage all Azure resources.", "remediation": "Create a Conditional Access policy targeting All Users with the Microsoft Azure Management app (797f4846-ba00-4fd7-ba43-dac1f8f63013) and MFA grant control.", "resource_id": "tenant-wide", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2.4"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.3.3"]}, {"framework": "NIST_800-53", "controls": ["IA-2(1)"]}], "risk": "The Azure portal and ARM APIs control all Azure resources. Without MFA for Azure Management, a compromised credential grants full control over cloud infrastructure, billing, and data.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-policy-azure-management"}, {"check_id": "entraid_ca_003", "status": "FAIL", "severity": "CRITICAL", "title": "No CA policy requires MFA for admin roles", "description": "No enabled Conditional Access policy enforces MFA specifically for users in privileged directory roles. Admin accounts should always have a dedicated MFA policy to prevent their exclusion from broader policies.", "remediation": "Create a Conditional Access policy targeting directory roles (e.g. Global Admin, Privileged Role Admin, Exchange Admin) with All Cloud Apps scope and MFA or authentication strength grant control.", "resource_id": "tenant-wide", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2.1"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.3.2"]}, {"framework": "NIST_800-53", "controls": ["IA-2(1)"]}], "risk": "Admin accounts are high-value targets. Without a dedicated MFA policy scoped to directory roles, compromised admin credentials grant full tenant control. Even if a global MFA policy exists, it may have exclusions that admins fall through.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-policy-admin-mfa"}, {"check_id": "entraid_ca_001", "status": "FAIL", "severity": "CRITICAL", "title": "No CA policy requires MFA for all users", "description": "No enabled Conditional Access policy enforces MFA for all users across all cloud apps. This was the exact attack vector in the Midnight Blizzard breach.", "remediation": "Create a Conditional Access policy targeting All Users with All Cloud Apps scope and MFA grant control.", "resource_id": "tenant-wide", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2.2"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.3.1"]}, {"framework": "NIST_800-53", "controls": ["IA-2"]}], "risk": "Without universal MFA enforcement, compromised credentials allow direct account takeover. This was the exact attack vector in the Midnight Blizzard breach.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-policy-all-users-mfa"}, {"check_id": "entraid_ca_014", "status": "SKIPPED_PERMISSION", "severity": "MEDIUM", "title": "Check skipped: Ensure sign-in frequency is configured for admin sessions", "description": "No Conditional Access policies available", "remediation": "", "resource_id": "", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "NIST_800-53", "controls": ["AC-12"]}], "risk": "Without sign-in frequency limits, admin refresh tokens can be valid for extended periods. A stolen admin refresh token can be used to maintain persistent access without re-authentication. Short sign-in frequency (e.g., 4-8 hours) limits the window of token abuse for privileged sessions.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-session-lifetime"}, {"check_id": "entraid_ca_008", "status": "FAIL", "severity": "MEDIUM", "title": "No named locations defined", "description": "No named locations (IP ranges or countries) are configured. Location-based Conditional Access policies cannot be created without named locations.", "remediation": "Define named locations for your trusted IP ranges (corporate networks, VPNs) and permitted countries. Use these in Conditional Access policies to block or restrict sign-ins from unknown locations.", "resource_id": "tenant-wide", "resource_type": "NamedLocation", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2.5"]}, {"framework": "NIST_800-53", "controls": ["AC-2(5)"]}], "risk": "Without named locations, Conditional Access policies cannot enforce location-based controls \u2014 no trusted IP ranges, no country-level blocking, and no impossible-travel detection context. This removes a key defense layer against foreign nation-state actors.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-assignment-network"}, {"check_id": "entraid_ca_007", "status": "FAIL", "severity": "MEDIUM", "title": "No persistent browser session restriction", "description": "No enabled Conditional Access policy restricts persistent browser sessions or enforces sign-in frequency. Sessions may persist indefinitely on unmanaged or shared devices.", "remediation": "Create a Conditional Access policy with session controls that disables persistent browser sessions (set persistentBrowser mode to 'never') or enforces a sign-in frequency for unmanaged device scenarios.", "resource_id": "tenant-wide", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.3.1"]}, {"framework": "NIST_800-53", "controls": ["AC-12"]}], "risk": "Persistent browser sessions keep users signed in indefinitely. On shared or unmanaged devices, this allows subsequent users to access organizational resources without re-authenticating.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-session-lifetime"}, {"check_id": "entraid_org_008", "status": "PASS", "severity": "LOW", "title": "Cross-tenant inbound policy does not trust external device claims", "description": "External device compliance and hybrid join claims are not trusted by default.", "remediation": "", "resource_id": "cross-tenant-default", "resource_type": "CrossTenantAccessPolicy", "frameworks": [{"framework": "NIST_800-53", "controls": ["AC-19"]}], "risk": "Trusting external device compliance claims means your CA policies accept device state assertions from other organizations. External tenants may have weaker device compliance policies, effectively bypassing your device requirements for B2B users.", "remediation_url": "https://learn.microsoft.com/en-us/entra/external-id/cross-tenant-access-settings-b2b-collaboration#to-change-inbound-trust-settings-for-mfa-and-device-claims"}, {"check_id": "entraid_org_004", "status": "FAIL", "severity": "MEDIUM", "title": "Unrestricted inbound cross-tenant access", "description": "Default cross-tenant access policy issues: B2B collaboration inbound allows all tenants. External users from any tenant can collaborate with your organization.", "remediation": "Review and restrict the default inbound cross-tenant access policy. Consider blocking inbound B2B collaboration by default and explicitly allowing only trusted partner organizations. Use cross-tenant access settings to control which external apps and users can access your resources.", "resource_id": "tenant-wide", "resource_type": "CrossTenantAccessPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.8.1"]}, {"framework": "NIST_800-53", "controls": ["AC-20"]}], "risk": "When inbound cross-tenant access defaults allow all external tenants, any compromised account in any external organization can be invited as a guest or connect via B2B direct connect. This expands your attack surface to every Entra ID tenant globally.", "remediation_url": "https://learn.microsoft.com/en-us/entra/external-id/cross-tenant-access-settings-b2b-collaboration"}, {"check_id": "entraid_org_007", "status": "PASS", "severity": "MEDIUM", "title": "Cross-tenant inbound policy does not trust external MFA", "description": "External MFA claims are not trusted by default. B2B users must satisfy your tenant's MFA requirements directly.", "remediation": "", "resource_id": "cross-tenant-default", "resource_type": "CrossTenantAccessPolicy", "frameworks": [{"framework": "NIST_800-53", "controls": ["IA-8(4)"]}], "risk": "When external MFA claims are trusted, your Conditional Access policies accept MFA performed in the external tenant. If the external tenant has weak MFA (e.g., SMS only), your security posture is effectively downgraded for B2B users from that tenant.", "remediation_url": "https://learn.microsoft.com/en-us/entra/external-id/cross-tenant-access-settings-b2b-collaboration#to-change-inbound-trust-settings-for-mfa-and-device-claims"}, {"check_id": "entraid_org_003", "status": "FAIL", "severity": "MEDIUM", "title": "Guest invite setting too permissive: everyone", "description": "allowInvitesFrom is set to 'everyone'. This allows too many users to invite external guests. Restrict to admins and guest inviters.", "remediation": "Restrict guest invitations to admins only or users in the Guest Inviter role. Configure the allowInvitesFrom property in the authorization policy to 'adminsAndGuestInviters' or 'none'.", "resource_id": "authorizationPolicy", "resource_type": "Policy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.2.2"]}, {"framework": "NIST_800-53", "controls": ["AC-2(7)"]}], "risk": "Unrestricted guest invitations allow any member to bring external users into the tenant. External users gain access to directory data and may be granted permissions to SharePoint sites, Teams, and applications without centralized review.", "remediation_url": "https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure"}, {"check_id": "entraid_org_006", "status": "FAIL", "severity": "MEDIUM", "title": "Unrestricted outbound B2B collaboration", "description": "Default outbound B2B collaboration policy allows all users to access all applications in any external tenant.", "remediation": "Review and restrict outbound cross-tenant access defaults. Configure specific partner organizations where outbound access is needed and block all others.", "resource_id": "b2bCollaborationOutbound", "resource_type": "CrossTenantAccessPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.7.2"]}, {"framework": "NIST_800-53", "controls": ["AC-20"]}], "risk": "Unrestricted outbound cross-tenant access allows users to accept invitations and share resources with any external Azure AD/Entra ID tenant. This can lead to data exfiltration, shadow IT, and unauthorized collaboration with untrusted organizations.", "remediation_url": "https://learn.microsoft.com/en-us/entra/external-id/cross-tenant-access-settings-b2b-collaboration"}, {"check_id": "entraid_org_001", "status": "PASS", "severity": "HIGH", "title": "Security Defaults enabled (no CA policies)", "description": "Security Defaults provide baseline MFA protection. Consider migrating to Conditional Access for granular policy control.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "Policy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.1.1"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.1.1"]}, {"framework": "NIST_800-53", "controls": ["IA-2"]}], "risk": "If Security Defaults are enabled alongside Conditional Access policies, the behavior can be unpredictable. If neither Security Defaults nor CA policies are configured, the tenant has no MFA enforcement at all.", "remediation_url": "https://learn.microsoft.com/en-us/entra/fundamentals/security-defaults"}, {"check_id": "entraid_org_005", "status": "PASS", "severity": "MEDIUM", "title": "6 authentication methods enabled", "description": "Authentication methods policy has 6 method(s) enabled. Verify SSPR is enabled for all users in the portal.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "AuthenticationMethodsPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.4.1"]}, {"framework": "NIST_800-53", "controls": ["IA-5(1)"]}], "risk": "Without SSPR, helpdesk staff become a target for social engineering to reset passwords on behalf of attackers. SSPR with proper MFA reduces this attack vector and improves user productivity.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/authentication/tutorial-enable-sspr"}, {"check_id": "entraid_org_002", "status": "PASS", "severity": "HIGH", "title": "User consent to applications is restricted", "description": "Users cannot consent to third-party applications without admin approval.", "remediation": "", "resource_id": "authorizationPolicy", "resource_type": "Policy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.5.1"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.1"]}, {"framework": "NIST_800-53", "controls": ["CM-7"]}], "risk": "When users can consent to any app, an attacker can create a malicious app and trick users into granting it access to their mailbox, files, and profile. This is the 'illicit consent grant' attack \u2014 it requires no credential compromise.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-user-consent"}, {"check_id": "entraid_org_009", "status": "FAIL", "severity": "MEDIUM", "title": "Non-admin users can register applications", "description": "The default user role allows application registration. Any user can create app registrations, which may be used for consent-grant phishing attacks.", "remediation": "Set 'Users can register applications' to No in the Entra ID user settings. Use the Application Developer role for users who need to create app registrations.", "resource_id": "tenant-wide", "resource_type": "Policy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.5.1"]}, {"framework": "NIST_800-53", "controls": ["CM-7"]}], "risk": "Users who can register applications can create app registrations that request permissions, potentially tricking other users into consenting. This is a common vector for consent-grant phishing attacks. Only authorized administrators should register applications.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/delegate-app-roles"}, {"check_id": "entraid_role_009", "status": "PASS", "severity": "MEDIUM", "title": "Application Administrator has 0 assignment(s)", "description": "Application Administrator count (0) is within the recommended maximum of 5.", "remediation": "", "resource_id": "Application Administrator", "resource_type": "DirectoryRole", "frameworks": [{"framework": "NIST_800-53", "controls": ["AC-6(1)"]}], "risk": "Application Administrators can add credentials to any application and service principal in the tenant, which can be used to impersonate those applications. Excessive assignments expand the attack surface for privilege escalation via application credential abuse.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/permissions-reference#application-administrator"}, {"check_id": "entraid_role_003", "status": "FAIL", "severity": "HIGH", "title": "No break-glass accounts detected", "description": "No Global Administrator accounts match common break-glass naming patterns and none are excluded from Conditional Access policies. Found 2 Global Admin(s) but none appear to be emergency access accounts.", "remediation": "Create at least two cloud-only break-glass accounts with Global Administrator role. Exclude them from all Conditional Access policies. Use long, complex passwords stored in a physical safe. Monitor sign-in activity on these accounts with alerts.", "resource_id": "tenant-wide", "resource_type": "User", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.2.1"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.1.1"]}, {"framework": "NIST_800-53", "controls": ["AC-2(1)"]}], "risk": "Without break-glass accounts, an MFA service outage, misconfigured Conditional Access policy, or federated identity provider failure can lock all administrators out of the tenant. Recovery requires a Microsoft support ticket and can take days.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/security-emergency-access"}, {"check_id": "entraid_role_010", "status": "PASS", "severity": "MEDIUM", "title": "Cloud Application Administrator has 0 assignment(s)", "description": "Cloud Application Administrator count (0) is within the recommended maximum of 5.", "remediation": "", "resource_id": "Cloud Application Administrator", "resource_type": "DirectoryRole", "frameworks": [{"framework": "NIST_800-53", "controls": ["AC-6(1)"]}], "risk": "Cloud Application Administrators can add secrets and certificates to service principals and app registrations, enabling impersonation of those applications. Excessive assignments increase the number of accounts that can perform credential abuse attacks.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/permissions-reference#cloud-application-administrator"}, {"check_id": "entraid_role_001", "status": "PASS", "severity": "CRITICAL", "title": "Global Admin count within limits: 2 (max: 4)", "description": "Found 2 Global Administrator assignment(s), which is within the recommended maximum of 4.", "remediation": "", "resource_id": "Global Administrator", "resource_type": "DirectoryRole", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.1.1"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.7.1"]}, {"framework": "NIST_800-53", "controls": ["AC-6(5)"]}], "risk": "Every Global Administrator has unrestricted access to all tenant settings and data. Excessive Global Admins expand the attack surface and violate least-privilege principles. A compromised Global Admin account grants total tenant control.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices"}, {"check_id": "entraid_role_004", "status": "PASS", "severity": "CRITICAL", "title": "No guest users found in tenant", "description": "", "remediation": "", "resource_id": "", "resource_type": "", "frameworks": [{"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.1"]}, {"framework": "NIST_800-53", "controls": ["AC-6"]}], "risk": "Guest accounts are managed outside your tenant and may not follow your security policies. A compromised external account with admin privileges gives an attacker full control over your directory.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices"}, {"check_id": "entraid_role_006", "status": "PASS", "severity": "HIGH", "title": "Privileged role assignment counts within limits", "description": "All monitored privileged roles have 5 or fewer assignments.", "remediation": "", "resource_id": "tenant", "resource_type": "DirectoryRoleAssignment", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["1.1.3"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.7.3"]}], "risk": "Over-assigning high-privilege roles creates excessive standing access. If any one of these accounts is compromised, the attacker gains significant control. The principle of least privilege requires minimizing the number of principals in any privileged role.", "remediation_url": "https://learn.microsoft.com/en-us/entra/id-governance/privileged-identity-management/pim-configure"}, {"check_id": "entraid_role_008", "status": "PASS", "severity": "HIGH", "title": "No users hold multiple high-privilege roles", "description": "No principal has two or more high-privilege directory role assignments.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "DirectoryRole", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["1.1.1"]}, {"framework": "NIST_800-53", "controls": ["AC-6(2)"]}], "risk": "A user holding multiple high-privilege roles (e.g., Global Admin + Exchange Admin) has an unnecessarily large blast radius. If the account is compromised, the attacker gains the combined privileges of all assigned roles. This also indicates a lack of role separation.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices"}, {"check_id": "entraid_role_002", "status": "FAIL", "severity": "HIGH", "title": "Permanent Global Administrator assignment: Brian Davis", "description": "'Brian Davis' has a permanent Global Administrator assignment. Consider using PIM for just-in-time activation.", "remediation": "Convert permanent role assignments to PIM-eligible assignments that require just-in-time activation. At minimum, configure PIM for Global Administrator, Privileged Role Administrator, and Exchange Administrator roles.", "resource_id": "b50de0bb-f2db-4a9e-8a26-d7ec5a2f0f55", "resource_type": "DirectoryRole", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.1.2"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.7.2"]}, {"framework": "NIST_800-53", "controls": ["AC-6(1)"]}], "risk": "Permanent role assignments provide continuous privileged access without time-boxing or approval workflows. If an account with a permanent privileged role is compromised, the attacker has immediate access without needing to activate PIM.", "remediation_url": "https://learn.microsoft.com/en-us/entra/id-governance/privileged-identity-management/pim-configure"}, {"check_id": "entraid_role_002", "status": "FAIL", "severity": "HIGH", "title": "Permanent Global Administrator assignment: Brian Davis", "description": "'Brian Davis' has a permanent Global Administrator assignment. Consider using PIM for just-in-time activation.", "remediation": "Convert permanent role assignments to PIM-eligible assignments that require just-in-time activation. At minimum, configure PIM for Global Administrator, Privileged Role Administrator, and Exchange Administrator roles.", "resource_id": "e4c7d5ac-7965-4249-bf7d-946cc1f66ef3", "resource_type": "DirectoryRole", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.1.2"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.7.2"]}, {"framework": "NIST_800-53", "controls": ["AC-6(1)"]}], "risk": "Permanent role assignments provide continuous privileged access without time-boxing or approval workflows. If an account with a permanent privileged role is compromised, the attacker has immediate access without needing to activate PIM.", "remediation_url": "https://learn.microsoft.com/en-us/entra/id-governance/privileged-identity-management/pim-configure"}, {"check_id": "entraid_role_002", "status": "FAIL", "severity": "HIGH", "title": "Permanent Billing Administrator assignment: Brian Davis", "description": "'Brian Davis' has a permanent Billing Administrator assignment. Consider using PIM for just-in-time activation.", "remediation": "Convert permanent role assignments to PIM-eligible assignments that require just-in-time activation. At minimum, configure PIM for Global Administrator, Privileged Role Administrator, and Exchange Administrator roles.", "resource_id": "e4c7d5ac-7965-4249-bf7d-946cc1f66ef3", "resource_type": "DirectoryRole", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.1.2"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.7.2"]}, {"framework": "NIST_800-53", "controls": ["AC-6(1)"]}], "risk": "Permanent role assignments provide continuous privileged access without time-boxing or approval workflows. If an account with a permanent privileged role is compromised, the attacker has immediate access without needing to activate PIM.", "remediation_url": "https://learn.microsoft.com/en-us/entra/id-governance/privileged-identity-management/pim-configure"}, {"check_id": "entraid_role_007", "status": "PASS", "severity": "HIGH", "title": "Privileged Role Administrator has 0 assignment(s)", "description": "PRA assignment count (0) is within the recommended maximum of 2.", "remediation": "", "resource_id": "Privileged Role Administrator", "resource_type": "DirectoryRole", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["1.1.4"]}, {"framework": "NIST_800-53", "controls": ["AC-6(1)"]}], "risk": "Privileged Role Administrators can grant any directory role to any principal, including Global Administrator. Excessive PRA assignments multiply the risk of privilege escalation. Each PRA is a potential path to full tenant compromise.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices"}, {"check_id": "entraid_role_005", "status": "PASS", "severity": "CRITICAL", "title": "No SPs with privileged directory roles", "description": "", "remediation": "", "resource_id": "", "resource_type": "", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.1.1"]}, {"framework": "NIST_800-53", "controls": ["AC-6"]}], "risk": "Service principals with directory roles can perform administrative actions without user interaction. A compromised app credential with Global Admin role gives an attacker complete tenant control.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices"}, {"check_id": "entraid_sp_007", "status": "SKIPPED_PERMISSION", "severity": "HIGH", "title": "Check skipped: Detect service principals with overly broad delegated permission grants", "description": "Missing permissions: DelegatedPermissionGrant.ReadWrite.All", "remediation": "", "resource_id": "", "resource_type": "OAuth2PermissionGrant", "frameworks": [], "risk": "Overly broad delegated permission grants allow service principals to act on behalf of all users with extensive access. Combined with admin consent, this creates a powerful access token that attackers can abuse for lateral movement and data exfiltration.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-application-permissions"}, {"check_id": "entraid_sp_001", "status": "FAIL", "severity": "HIGH", "title": "Disabled SP with active credentials: EntraLint-Demo-DisabledSP-2604271101", "description": "Service principal 'EntraLint-Demo-DisabledSP-2604271101' is disabled but has 1 active credential(s). Remove credentials or delete the service principal.", "remediation": "Remove all credentials (secrets and certificates) from disabled service principals. If the service principal is no longer needed, delete it entirely.", "resource_id": "95da492a-b0c1-4ea3-9302-6b679a6e6327", "resource_type": "ServicePrincipal", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.1"]}, {"framework": "NIST_800-53", "controls": ["AC-2(3)"]}], "risk": "Disabled service principals with active credentials represent latent access paths. If re-enabled accidentally or by an attacker with sufficient privileges, the existing credentials provide immediate access without requiring credential provisioning.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/disable-user-sign-in-portal"}, {"check_id": "entraid_sp_009", "status": "PASS", "severity": "LOW", "title": "No service principals have dual credential types", "description": "No service principals have both password and certificate credentials.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "ServicePrincipal", "frameworks": [{"framework": "NIST_800-53", "controls": ["IA-5(2)"]}], "risk": "Service principals with both credential types have an expanded attack surface. Password credentials are weaker and more easily exfiltrated than certificates. If the intent is to use certificates only, leftover password credentials provide an alternative authentication path for attackers.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity-platform/certificate-credentials"}, {"check_id": "entraid_sp_004", "status": "SKIPPED_PERMISSION", "severity": "HIGH", "title": "Check skipped: Review admin-consented delegated permissions with broad scope", "description": "Missing permissions: DelegatedPermissionGrant.Read.All", "remediation": "", "resource_id": "", "resource_type": "OAuth2PermissionGrant", "frameworks": [], "risk": "Admin-consented delegated permissions apply to all users in the tenant. If a third-party app has Mail.ReadWrite consented for all users, access to every user mailbox via that app, with attacker needing only a valid user token. This is the delegated equivalent of over-privileged application permissions.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-consent-requests"}, {"check_id": "entraid_sp_008", "status": "FAIL", "severity": "MEDIUM", "title": "Defender for Containers provisioning ARC k8s Enabled: 2 expired credential(s)", "description": "Service principal 'Defender for Containers provisioning ARC k8s Enabled' has 2 expired credential(s) that should be removed.", "remediation": "Remove expired credentials from service principals. If the service principal is still in use, rotate credentials. If it is no longer needed, delete it.", "resource_id": "714ddf13-c0f6-489c-801c-e84bbbe7ce42", "resource_type": "ServicePrincipal", "frameworks": [{"framework": "NIST_800-53", "controls": ["IA-5(1)"]}], "risk": "Service principals with expired credentials may be abandoned or poorly maintained. These SPs may still have granted permissions that could be exploited if new credentials are added. Expired credentials also indicate incomplete cleanup after credential rotation.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/overview-application-properties"}, {"check_id": "entraid_sp_008", "status": "FAIL", "severity": "MEDIUM", "title": "Defender for Containers provisioning AKS Security Profile: 1 expired credential(s)", "description": "Service principal 'Defender for Containers provisioning AKS Security Profile' has 1 expired credential(s) that should be removed.", "remediation": "Remove expired credentials from service principals. If the service principal is still in use, rotate credentials. If it is no longer needed, delete it.", "resource_id": "b5ee987b-4a41-4623-ab4c-d25e663f1c72", "resource_type": "ServicePrincipal", "frameworks": [{"framework": "NIST_800-53", "controls": ["IA-5(1)"]}], "risk": "Service principals with expired credentials may be abandoned or poorly maintained. These SPs may still have granted permissions that could be exploited if new credentials are added. Expired credentials also indicate incomplete cleanup after credential rotation.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/overview-application-properties"}, {"check_id": "entraid_sp_008", "status": "FAIL", "severity": "MEDIUM", "title": "Defender for Containers provisioning Policy extension for Arc-e: 2 expired credential(s)", "description": "Service principal 'Defender for Containers provisioning Policy extension for Arc-e' has 2 expired credential(s) that should be removed.", "remediation": "Remove expired credentials from service principals. If the service principal is still in use, rotate credentials. If it is no longer needed, delete it.", "resource_id": "d0ae07cc-330f-4201-b316-697b5dc34490", "resource_type": "ServicePrincipal", "frameworks": [{"framework": "NIST_800-53", "controls": ["IA-5(1)"]}], "risk": "Service principals with expired credentials may be abandoned or poorly maintained. These SPs may still have granted permissions that could be exploited if new credentials are added. Expired credentials also indicate incomplete cleanup after credential rotation.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/overview-application-properties"}, {"check_id": "entraid_sp_008", "status": "FAIL", "severity": "MEDIUM", "title": "Defender for Containers provisioning Azure Policy Addon for Kub: 1 expired credential(s)", "description": "Service principal 'Defender for Containers provisioning Azure Policy Addon for Kub' has 1 expired credential(s) that should be removed.", "remediation": "Remove expired credentials from service principals. If the service principal is still in use, rotate credentials. If it is no longer needed, delete it.", "resource_id": "e3984296-0890-40ef-ab27-209646f54f3c", "resource_type": "ServicePrincipal", "frameworks": [{"framework": "NIST_800-53", "controls": ["IA-5(1)"]}], "risk": "Service principals with expired credentials may be abandoned or poorly maintained. These SPs may still have granted permissions that could be exploited if new credentials are added. Expired credentials also indicate incomplete cleanup after credential rotation.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/overview-application-properties"}, {"check_id": "entraid_sp_003", "status": "PASS", "severity": "CRITICAL", "title": "No SPs with high-privilege granted application permissions", "description": "No service principals have been granted dangerous Microsoft Graph application roles.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "ServicePrincipal", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.5"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.2"]}, {"framework": "NIST_800-53", "controls": ["AC-6"]}], "risk": "Granted application permissions are live, consented access. A service principal with Application.ReadWrite.All can create new app registrations and grant itself more permissions. Mail.ReadWrite grants full mailbox access across all users. These represent the actual blast radius of a compromised workload identity.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity-platform/app-only-access-primer"}, {"check_id": "entraid_sp_002", "status": "PASS", "severity": "MEDIUM", "title": "No service principals using client secrets", "description": "All service principals use certificate credentials or have no credentials.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "ServicePrincipal", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.2"]}, {"framework": "NIST_800-53", "controls": ["IA-5(2)"]}], "risk": "Client secrets are plaintext strings that can leak through logs, environment variables, or configuration files. Certificates are bound to the machine's certificate store and provide non-repudiation. Microsoft recommends certificates for production workloads.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity-platform/certificate-credentials"}, {"check_id": "entraid_sp_006", "status": "PASS", "severity": "HIGH", "title": "No stale SPs with unused credentials", "description": "", "remediation": "", "resource_id": "", "resource_type": "", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.3.3.1"]}, {"framework": "NIST_800-53", "controls": ["AC-2"]}], "risk": "Service principals with valid credentials that are not actively used represent dormant attack vectors. If their credentials are compromised, the breach may go undetected for a long time.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-application-permissions"}, {"check_id": "entraid_sp_005", "status": "FAIL", "severity": "MEDIUM", "title": "Third-party SP with app permissions: EntraLint-Demo-AgentBP-Good-2604271101", "description": "Third-party app 'EntraLint-Demo-AgentBP-Good-2604271101' has 1 application permission(s) across 1 resource(s).", "remediation": "Review all third-party service principals with application permissions. Remove grants for apps that are no longer in use. Apply least-privilege by replacing broad permissions with narrower scopes. Consider using application access policies to restrict mailbox or site access.", "resource_id": "EntraLint-Demo-AgentBP-Good-2604271101", "resource_type": "ServicePrincipal", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2"]}, {"framework": "NIST_800-53", "controls": ["AC-6", "SA-9"]}], "risk": "Third-party service principals with application permissions can access tenant data without user interaction. If a third-party vendor is compromised, granted application permissions provide a direct path to exfiltrate data or escalate privilege within the tenant.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-application-permissions"}, {"check_id": "entraid_sp_005", "status": "FAIL", "severity": "MEDIUM", "title": "Third-party SP with app permissions: EntraLint-Demo-AgentBP-NoDesc-2604271101", "description": "Third-party app 'EntraLint-Demo-AgentBP-NoDesc-2604271101' has 1 application permission(s) across 1 resource(s).", "remediation": "Review all third-party service principals with application permissions. Remove grants for apps that are no longer in use. Apply least-privilege by replacing broad permissions with narrower scopes. Consider using application access policies to restrict mailbox or site access.", "resource_id": "EntraLint-Demo-AgentBP-NoDesc-2604271101", "resource_type": "ServicePrincipal", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2"]}, {"framework": "NIST_800-53", "controls": ["AC-6", "SA-9"]}], "risk": "Third-party service principals with application permissions can access tenant data without user interaction. If a third-party vendor is compromised, granted application permissions provide a direct path to exfiltrate data or escalate privilege within the tenant.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-application-permissions"}, {"check_id": "entraid_sp_005", "status": "FAIL", "severity": "MEDIUM", "title": "Third-party SP with app permissions: EntraLint-Demo-AgentBP-Overpriv-2604271101", "description": "Third-party app 'EntraLint-Demo-AgentBP-Overpriv-2604271101' has 1 application permission(s) across 1 resource(s).", "remediation": "Review all third-party service principals with application permissions. Remove grants for apps that are no longer in use. Apply least-privilege by replacing broad permissions with narrower scopes. Consider using application access policies to restrict mailbox or site access.", "resource_id": "EntraLint-Demo-AgentBP-Overpriv-2604271101", "resource_type": "ServicePrincipal", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2"]}, {"framework": "NIST_800-53", "controls": ["AC-6", "SA-9"]}], "risk": "Third-party service principals with application permissions can access tenant data without user interaction. If a third-party vendor is compromised, granted application permissions provide a direct path to exfiltrate data or escalate privilege within the tenant.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-application-permissions"}, {"check_id": "entraid_sp_005", "status": "FAIL", "severity": "MEDIUM", "title": "Third-party SP with app permissions: EntraLint-Demo-AgentBP-Secret-2604271101", "description": "Third-party app 'EntraLint-Demo-AgentBP-Secret-2604271101' has 1 application permission(s) across 1 resource(s).", "remediation": "Review all third-party service principals with application permissions. Remove grants for apps that are no longer in use. Apply least-privilege by replacing broad permissions with narrower scopes. Consider using application access policies to restrict mailbox or site access.", "resource_id": "EntraLint-Demo-AgentBP-Secret-2604271101", "resource_type": "ServicePrincipal", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.2.2"]}, {"framework": "NIST_800-53", "controls": ["AC-6", "SA-9"]}], "risk": "Third-party service principals with application permissions can access tenant data without user interaction. If a third-party vendor is compromised, granted application permissions provide a direct path to exfiltrate data or escalate privilege within the tenant.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-application-permissions"}, {"check_id": "entraid_user_006", "status": "PASS", "severity": "LOW", "title": "Guest user count within limits: 0", "description": "Tenant has 0 guest users (threshold: 50).", "remediation": "", "resource_id": "tenant", "resource_type": "User", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.8.2"]}, {"framework": "NIST_800-53", "controls": ["AC-2(3)"]}], "risk": "Guest accounts often have weaker security controls than member accounts. Large guest populations increase the attack surface and make it harder to audit external access. Abandoned or forgotten guest accounts may retain access to shared resources indefinitely.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/governance/manage-guest-access-with-access-reviews"}, {"check_id": "entraid_user_002", "status": "PASS", "severity": "LOW", "title": "No disabled member accounts found", "description": "All member accounts in the tenant are enabled.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "User", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.3.1"]}, {"framework": "NIST_800-53", "controls": ["AC-2(3)"]}], "risk": "Disabled accounts left in the directory retain group memberships, role assignments, and app consent grants. If an admin re-enables the account, all previous access is instantly restored. They also inflate licensing counts and create noise in access reviews.", "remediation_url": "https://learn.microsoft.com/en-us/entra/id-governance/lifecycle-workflow-tasks"}, {"check_id": "entraid_user_009", "status": "PASS", "severity": "HIGH", "title": "No disabled accounts have role assignments", "description": "All disabled user accounts have had their directory role assignments removed.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "User", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["1.1.5"]}, {"framework": "NIST_800-53", "controls": ["AC-2(3)"]}], "risk": "Disabled accounts with active role assignments are a ticking time bomb. If re-enabled (accidentally or maliciously), the account immediately regains its privileged access. This pattern also indicates weak offboarding procedures.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices"}, {"check_id": "entraid_user_004", "status": "FAIL", "severity": "HIGH", "title": "Guest access not fully restricted", "description": "Guest users have limited directory access. Consider restricting to own profile only.", "remediation": "Set guestUserRoleId to 2af84b1e-32c8-42b7-82bc-daa82404023b (restricted access) in the authorization policy.", "resource_id": "", "resource_type": "AuthorizationPolicy", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.3.1"]}, {"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.2"]}], "risk": "If guest users have the same access as members, external users can enumerate all users, groups, and applications in your directory, facilitating reconnaissance for targeted attacks.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/users/users-restrict-guest-permissions"}, {"check_id": "entraid_user_001", "status": "PASS", "severity": "MEDIUM", "title": "No guest users found", "description": "No external guest accounts exist in the tenant.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "User", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.2.1"]}, {"framework": "NIST_800-53", "controls": ["AC-2"]}], "risk": "Guest users from external organizations can enumerate directory objects, access shared applications, and may have been granted permissions to sensitive resources. Unreviewed guest accounts from former partners or contractors represent persistent external access.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/users/clean-up-stale-guest-accounts"}, {"check_id": "entraid_user_005", "status": "SKIPPED_PERMISSION", "severity": "HIGH", "title": "Check skipped: Detect guest or external users excluded from Conditional Access policies", "description": "No Conditional Access policies configured", "remediation": "", "resource_id": "", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "CISA_SCuBA", "controls": ["MS.AAD.8.2"]}, {"framework": "CIS_M365_v5", "controls": ["5.2.2.7"]}], "risk": "Excluding guest users from CA policies creates a two-tier security model where external identities bypass protections that internal users are subject to. Attackers target the weakest link \u2014 unprotected guest accounts can be used for initial access.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-users-groups#exclude-users"}, {"check_id": "entraid_user_007", "status": "SKIPPED_PERMISSION", "severity": "MEDIUM", "title": "Check skipped: Ensure guest users are covered by risk-based Conditional Access policies", "description": "No Conditional Access policies available", "remediation": "", "resource_id": "", "resource_type": "ConditionalAccessPolicy", "frameworks": [{"framework": "NIST_800-53", "controls": ["AC-2(12)"]}], "risk": "Guest accounts are often overlooked in Conditional Access targeting. Without risk-based CA coverage, a compromised guest account will not trigger risk-based blocks or MFA challenges, allowing attackers to operate undetected.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-policy-risk"}, {"check_id": "entraid_user_003", "status": "SKIPPED_PERMISSION", "severity": "MEDIUM", "title": "Check skipped: Identify stale user accounts with no recent sign-in activity", "description": "Missing permissions: AuditLog.Read.All", "remediation": "", "resource_id": "", "resource_type": "User", "frameworks": [], "risk": "Stale accounts represent abandoned credentials. If compromised via password spray or credential stuffing, the legitimate owner is unlikely to notice. These accounts often retain group memberships and access rights from their active period.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/users/clean-up-stale-guest-accounts"}, {"check_id": "entraid_user_008", "status": "PASS", "severity": "MEDIUM", "title": "No guest accounts found", "description": "No guest accounts exist in the tenant.", "remediation": "", "resource_id": "tenant-wide", "resource_type": "User", "frameworks": [{"framework": "CIS_M365_v5", "controls": ["5.1.8.2"]}, {"framework": "NIST_800-53", "controls": ["AC-2(3)"]}], "risk": "Guest accounts that have not been used in over 90 days may belong to former collaborators or vendors. These dormant accounts are targets for credential stuffing and B2B account takeover. Each stale guest is an unnecessary entry point into the tenant.", "remediation_url": "https://learn.microsoft.com/en-us/entra/identity/users/clean-up-stale-guest-accounts"}]};
+
+// --- Donut chart (SVG) ---
+(function() {
+  const svg = document.getElementById('donut');
+  const legend = document.getElementById('sev-legend');
+  const sc = SCAN_DATA.severity_counts;
+  const items = [
+    { label: 'Critical', count: sc.CRITICAL || 0, color: '#d13438' },
+    { label: 'High', count: sc.HIGH || 0, color: '#ca5010' },
+    { label: 'Medium', count: sc.MEDIUM || 0, color: '#8a8886' },
+    { label: 'Low', count: sc.LOW || 0, color: '#0078d4' },
+  ];
+  const total = items.reduce((a, b) => a + b.count, 0);
+  if (total === 0) {
+    svg.innerHTML = '<text x="18" y="20" text-anchor="middle" fill="#a19f9d" font-size="3.5" font-family="Segoe UI,sans-serif">No failures</text>';
+    return;
+  }
+  let cum = 0;
+  items.forEach(item => {
+    if (item.count === 0) return;
+    const pct = item.count / total;
+    const dash = pct * 100;
+    const offset = -cum * 100 + 25;
+    cum += pct;
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', '18'); circle.setAttribute('cy', '18');
+    circle.setAttribute('r', '15.915');
+    circle.setAttribute('fill', 'none');
+    circle.setAttribute('stroke', item.color);
+    circle.setAttribute('stroke-width', '3');
+    circle.setAttribute('stroke-dasharray', dash + ' ' + (100 - dash));
+    circle.setAttribute('stroke-dashoffset', String(offset));
+    svg.appendChild(circle);
+    legend.innerHTML += '<div class="legend-item"><div class="legend-dot" style="background:' + item.color + '"></div><span class="legend-count">' + item.count + '</span> ' + item.label + '</div>';
+  });
+  svg.innerHTML += '<text x="18" y="19" text-anchor="middle" fill="#323130" font-size="6" font-weight="600" font-family="Segoe UI,sans-serif">' + total + '</text><text x="18" y="22.5" text-anchor="middle" fill="#a19f9d" font-size="2.5" font-family="Segoe UI,sans-serif">failures</text>';
+})();
+
+// --- Category bars ---
+(function() {
+  const bars = document.getElementById('cat-bars');
+  const cc = SCAN_DATA.category_counts;
+  const entries = Object.entries(cc).sort((a, b) => b[1] - a[1]);
+  const max = entries.length > 0 ? entries[0][1] : 1;
+  const catColors = { ca: '#d13438', app: '#ca5010', sp: '#8764b8', role: '#005a9e', user: '#0078d4', org: '#107c10', auth: '#008272', agent: '#986f0b' };
+  entries.forEach(([cat, count]) => {
+    const pct = Math.max((count / max) * 100, 10);
+    const color = catColors[cat] || '#8a8886';
+    bars.innerHTML += '<div class="bar-row"><div class="bar-label">' + cat + '</div><div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:' + color + '">' + count + '</div></div></div>';
+  });
+  if (entries.length === 0) bars.innerHTML = '<div style="color:#a19f9d;font-size:0.8125rem;padding:1rem 0">No failures detected</div>';
+})();
+
+// --- Findings table ---
+const tbody = document.getElementById('findings-body');
+const sevOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+let sortKey = 'severity', sortAsc = true;
+
+function statusGroup(s) {
+  if (s === 'FAIL') return 'FAIL';
+  if (s === 'PASS') return 'PASS';
+  return 'SKIP';
+}
+
+function renderFindings() {
+  const statusFilter = document.getElementById('filter-status').value;
+  const sevFilter = document.getElementById('filter-sev').value;
+  const search = document.getElementById('filter-search').value.toLowerCase();
+
+  let data = SCAN_DATA.findings.filter(f => {
+    if (statusFilter !== 'all' && statusGroup(f.status) !== statusFilter) return false;
+    if (sevFilter !== 'all' && f.severity !== sevFilter) return false;
+    if (search && !(f.check_id + ' ' + f.title + ' ' + f.resource_id).toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  data.sort((a, b) => {
+    let va, vb;
+    if (sortKey === 'severity') { va = sevOrder[a.severity] ?? 9; vb = sevOrder[b.severity] ?? 9; }
+    else { va = (a[sortKey] || '').toLowerCase(); vb = (b[sortKey] || '').toLowerCase(); }
+    if (va < vb) return sortAsc ? -1 : 1;
+    if (va > vb) return sortAsc ? 1 : -1;
+    return 0;
+  });
+
+  document.getElementById('result-count').textContent = data.length + ' of ' + SCAN_DATA.findings.length + ' findings';
+
+  let html = '';
+  data.forEach((f, i) => {
+    const sg = statusGroup(f.status);
+    const statusText = sg === 'SKIP' ? 'SKIP' : f.status;
+    html += '<tr class="finding-row" data-idx="' + i + '" onclick="toggleDetail(' + i + ')">';
+    html += '<td><span class="sev-badge sev-' + f.severity + '">' + f.severity + '</span></td>';
+    html += '<td class="status-' + sg + '">' + statusText + '</td>';
+    html += '<td style="font-family:\'Consolas\',\'Courier New\',monospace;font-size:0.75rem;color:var(--text-secondary)">' + esc(f.check_id) + '</td>';
+    html += '<td>' + esc(f.title);
+    if (sg === 'SKIP' && f.description) html += '<div style="font-size:0.75rem;color:var(--text-light);margin-top:2px">' + esc(f.description) + '</div>';
+    html += '</td>';
+    html += '<td style="color:var(--text-light);font-size:0.75rem">' + esc(f.resource_id) + '</td>';
+    html += '</tr>';
+    html += '<tr class="detail-row" id="detail-' + i + '"><td colspan="5" class="detail-cell">';
+    if (f.description) html += '<h4>Description</h4><p>' + esc(f.description) + '</p>';
+    if (f.risk) html += '<h4>Risk</h4><p>' + esc(f.risk) + '</p>';
+    if (f.remediation) html += '<h4>Remediation</h4><p>' + esc(f.remediation) + '</p>';
+    if (f.remediation_url) html += '<p><a href="' + esc(f.remediation_url) + '" target="_blank" rel="noopener">' + esc(f.remediation_url) + '</a></p>';
+    if (f.frameworks && f.frameworks.length > 0) {
+      html += '<h4>Frameworks</h4>';
+      f.frameworks.forEach(fw => {
+        fw.controls.forEach(c => { html += '<span class="fw-tag">' + esc(fw.framework) + ' ' + esc(c) + '</span>'; });
+      });
+    }
+    html += '</td></tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+function toggleDetail(i) {
+  const el = document.getElementById('detail-' + i);
+  if (el) el.classList.toggle('open');
+}
+
+document.querySelectorAll('.findings-table th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if (sortKey === key) sortAsc = !sortAsc;
+    else { sortKey = key; sortAsc = true; }
+    renderFindings();
+  });
+});
+
+document.getElementById('filter-status').addEventListener('change', renderFindings);
+document.getElementById('filter-sev').addEventListener('change', renderFindings);
+document.getElementById('filter-search').addEventListener('input', renderFindings);
+
+// --- Tab switching ---
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+renderFindings();
+</script>
+</body>
+</html>
