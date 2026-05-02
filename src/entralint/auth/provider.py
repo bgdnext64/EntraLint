@@ -1,3 +1,4 @@
+# TODO: Feature: new-check scaffold command
 """Authentication provider — wraps MSAL for token acquisition."""
 
 from __future__ import annotations

@@ -1,0 +1,9 @@
+diff --git a/src/entralint/auth/provider.py b/src/entralint/auth/provider.py
+index 6771dd3..d4291c5 100644
+--- a/src/entralint/auth/provider.py
++++ b/src/entralint/auth/provider.py
+@@ -1,3 +1,4 @@
++# TODO: Feature: new-check scaffold command
+ """Authentication provider — wraps MSAL for token acquisition."""
+ 
+ from __future__ import annotations
