@@ -11,22 +11,7 @@ permissions:
   id-token: write         # Required for workload identity federation
 
 jobs:
-  # Option A: Client secret authentication
-  scan-with-secret:
-    name: Scan (Client Secret)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run EntraLint
-        uses: bgdnext64/EntraLint@v0.1.0
-        with:
-          tenant-id: ${{ secrets.ENTRALINT_TENANT_ID }}
-          client-id: ${{ secrets.ENTRALINT_CLIENT_ID }}
-          client-secret: ${{ secrets.ENTRALINT_CLIENT_SECRET }}
-          fail-on: high
-
-  # Option B: Workload identity federation (no secrets needed)
+  # Workload identity federation (passwordless, no client secret to manage)
   scan-with-wif:
     name: Scan (Workload Identity Federation)
     runs-on: ubuntu-latest
