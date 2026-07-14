@@ -25,10 +25,10 @@ It's a fair question. Microsoft ships excellent built-in tools — Identity Secu
 |---|---|---|---|---|
 | **Where it runs** | Azure portal dashboard | Azure portal dashboard | Requires sensor on DCs / Entra Connect | CLI, CI/CD pipelines, GitHub Actions |
 | **Focus area** | ~20 high-level Entra ID settings | ~50 Entra ID + hybrid recommendations | On-premises AD, Kerberos, NTLM, certificates | Cloud-native Entra ID configuration (88 checks) |
-| **App & SP credential hygiene** | — | Expiring creds only | — | 18 checks: expired, long-lived, dual-type, high-privilege grants, orphaned owners, stale SPs |
+| **App & SP credential & permission hygiene** | — | Expiring creds only | — | 18 checks: expired, long-lived, dual-type, high-privilege grants, orphaned owners, stale SPs |
 | **Conditional Access depth** | MFA, legacy auth, risk policies | Same as Secure Score | — | 14 checks: device code flow, session controls, exclusion sprawl, guest targeting, device compliance for admins |
 | **Privileged role analysis** | GA count, least privilege | Same | Lateral movement paths (on-prem) | 10 checks: PIM usage, break-glass accounts, guests in roles, SPs in roles, multi-role users, per-role caps |
-| **Agentic identity (Entra Agent ID)** | — | — | — | 18 dedicated checks (first scanner to cover this) |
+| **Agentic identity (Entra Agent ID)** | — | — | — | 18 dedicated checks (purpose-built for this emerging surface) |
 | **Cross-tenant & guest access** | — | — | — | 8 checks: inbound/outbound trust, MFA trust, guest invite settings, guest CA coverage |
 | **Output formats** | Portal only | Portal only | Portal / Sentinel | Table, JSON, SARIF, HTML |
 | **CI/CD gating** | No | No | No | `--fail-on critical` exits non-zero |
@@ -272,7 +272,7 @@ Every check includes:
 
 ### Agentic Identity Checks
 
-EntraLint is the first security scanner to provide dedicated checks for **Microsoft Entra Agent ID** — the identity platform that gives AI agents their own first-class identity type in Entra ID (Graph API v1.0 since March 2026). These 18 checks cover agent blueprints, blueprint principals, and agent identity instances, detecting issues like:
+EntraLint is among the first security scanners to provide dedicated checks for **Microsoft Entra Agent ID** — the identity platform that gives AI agents their own first-class identity type in Entra ID (Graph API v1.0 since March 2026). These 18 checks cover agent blueprints, blueprint principals, and agent identity instances, detecting issues like:
 
 - Agents holding dangerous or blocked permissions (e.g., `Files.ReadWrite.All`, `RoleManagement.ReadWrite.Directory`)
 - Blueprints using `allAllowedScopes` inheritance (allows agents to inherit any permission)
@@ -851,9 +851,14 @@ but tagged for teardown:
 - A blueprint principal for each, plus 6 agent identities — including a no-sponsor agent, one granted a high-risk delegated scope (`Mail.ReadWrite`), and one disabled while retaining an app role
 
 These trigger `entraid_agent_008`, `_010`, `_012`, `_013`, `_014`, `_015`,
-`_017`, and `_018`. A few (the delegated grant and app-role assignment)
-need Global Administrator / privileged-role rights on the signed-in
-account; the script logs a warning and continues if they're rejected.
+`_017`, and `_018`. The agents are also flagged by `entraid_agent_005`
+(non-admin creator): because the script provisions them via the Microsoft
+Graph PowerShell / CLI app, that check now recognizes the creator as
+Microsoft first-party self-service tooling and reports it at **LOW**
+("created via self-service tooling") rather than as an unknown external
+app. A few checks (the delegated grant and app-role assignment) need
+Global Administrator / privileged-role rights on the signed-in account;
+the script logs a warning and continues if they're rejected.
 
 ### How safety works
 
