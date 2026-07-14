@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_agent_013",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure agent identities do not hold high-risk delegated permissions",
+    "ServiceName": "AgentIdentity",
+    "Severity": "HIGH",
+    "ResourceType": "AgentIdentity",
+    "Description": "Checks the OAuth2 delegated permission grants held by each agent identity for high-risk scopes such as Mail.ReadWrite, Files.ReadWrite.All, and Directory.AccessAsUser.All. Existing agent permission checks only inspect application (app role) permissions; delegated grants acting on-behalf-of a user are evaluated here.",
+    "Risk": "An agent with high-risk delegated scopes can act with a signed-in user's authority to read or modify mail, files, and directory objects. Because delegated access blends the agent's and the user's privileges, abuse or compromise is harder to attribute and can reach any resource the user can access.",
+    "Remediation": {
+        "Recommendation": "Remove unnecessary high-risk delegated grants from the agent. Prefer narrowly scoped, least-privilege delegated permissions and require per-user consent instead of tenant-wide admin consent where possible.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/oauth2permissiongrant"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["AC-6"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/servicePrincipals/{id}/oauth2PermissionGrants"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Delegated grants are collected per agent into AgentIdentity.oauth2_permission_grants. Each grant carries a space-delimited 'scope' string."
+}

@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_agent_017",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure disabled agent identities do not retain permissions",
+    "ServiceName": "AgentIdentity",
+    "Severity": "MEDIUM",
+    "ResourceType": "AgentIdentity",
+    "Description": "Checks for agent identities that are disabled (accountEnabled is false) yet still retain application role assignments or delegated permission grants. Mirrors the equivalent service principal control for agents.",
+    "Risk": "A disabled agent that still holds permissions is a latent risk: if it is re-enabled, whether by mistake, by an attacker, or by an automated process, it immediately regains its full access without any fresh review. Standing permissions on dormant identities also inflate the attack surface.",
+    "Remediation": {
+        "Recommendation": "Remove the app role assignments and delegated permission grants from disabled agents. If the agent is permanently retired, delete it rather than leaving it disabled with standing access.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["AC-2", "AC-6"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/servicePrincipals/microsoft.graph.agentIdentity"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "accountEnabled, app_role_assignments and oauth2_permission_grants are collected per agent."
+}

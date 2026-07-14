@@ -552,11 +552,26 @@ function Seed-AgentIdentities {
     $me = Get-CurrentUser
     $sponsorUri = "$script:GraphBase/users/$($me.id)"
 
+    # Resolve the Microsoft Graph service principal (needed for delegated
+    # grants and app-role assignments seeded onto agent identities).
+    $graphSpId = $null
+    try {
+        $graphSpResp = Invoke-Graph -Method GET `
+            -Uri "$script:GraphBase/servicePrincipals?`$filter=appId eq '$GRAPH_RESOURCE_APP_ID'" -IgnoreError
+        if ($graphSpResp -and $graphSpResp.value) { $graphSpId = $graphSpResp.value[0].id }
+    } catch { }
+
     $blueprints = @(
-        @{ slug = 'AgentBP-Good';     body = @{ displayName = (New-DemoName 'AgentBP-Good');     description = 'Well-configured agent blueprint';   'sponsors@odata.bind' = @($sponsorUri) } },
-        @{ slug = 'AgentBP-NoDesc';   body = @{ displayName = (New-DemoName 'AgentBP-NoDesc');                                                       'sponsors@odata.bind' = @($sponsorUri) } },
-        @{ slug = 'AgentBP-Overpriv'; body = @{ displayName = (New-DemoName 'AgentBP-Overpriv'); description = 'Overprivileged agent blueprint';     'sponsors@odata.bind' = @($sponsorUri) } },
-        @{ slug = 'AgentBP-Secret';   body = @{ displayName = (New-DemoName 'AgentBP-Secret');   description = 'Uses client secrets';                'sponsors@odata.bind' = @($sponsorUri) } }
+        @{ slug = 'AgentBP-Good';        body = @{ displayName = (New-DemoName 'AgentBP-Good');        description = 'Well-configured agent blueprint';   'sponsors@odata.bind' = @($sponsorUri) } },
+        @{ slug = 'AgentBP-NoDesc';      body = @{ displayName = (New-DemoName 'AgentBP-NoDesc');                                                          'sponsors@odata.bind' = @($sponsorUri) } },
+        @{ slug = 'AgentBP-Overpriv';    body = @{ displayName = (New-DemoName 'AgentBP-Overpriv');    description = 'Overprivileged agent blueprint';     'sponsors@odata.bind' = @($sponsorUri) } },
+        @{ slug = 'AgentBP-Secret';      body = @{ displayName = (New-DemoName 'AgentBP-Secret');      description = 'Uses client secrets';                'sponsors@odata.bind' = @($sponsorUri) } },
+        # entraid_agent_014 (HIGH): multi-tenant sign-in audience.
+        @{ slug = 'AgentBP-MultiTenant'; body = @{ displayName = (New-DemoName 'AgentBP-MultiTenant'); description = 'Multi-tenant agent blueprint'; signInAudience = 'AzureADMultipleOrgs'; 'sponsors@odata.bind' = @($sponsorUri) } },
+        # entraid_agent_015 (HIGH): a misconfigured federated credential is added below.
+        @{ slug = 'AgentBP-BadFIC';      body = @{ displayName = (New-DemoName 'AgentBP-BadFIC');      description = 'Blueprint with a misconfigured federated credential'; 'sponsors@odata.bind' = @($sponsorUri) } },
+        # entraid_agent_018 (LOW): blueprint intentionally created without any sponsor.
+        @{ slug = 'AgentBP-NoSponsor';   body = @{ displayName = (New-DemoName 'AgentBP-NoSponsor');   description = 'Blueprint with no accountable sponsor' } }
     )
 
     $created = @{}
@@ -578,6 +593,30 @@ function Seed-AgentIdentities {
         }
     }
 
+    # entraid_agent_015 (HIGH): add an insecure federated identity credential
+    # to the BadFIC blueprint (wildcard subject + non-HTTPS issuer + wrong
+    # audience). Any single problem is enough for the check to FAIL.
+    if ($created['AgentBP-BadFIC']) {
+        if ($PSCmdlet.ShouldProcess($created['AgentBP-BadFIC'].id, 'Add misconfigured federated credential')) {
+            # Entra enforces an HTTPS issuer and the api://AzureADTokenExchange
+            # audience, so those cannot be malformed via the API. A wildcard
+            # subject IS accepted and is what entraid_agent_015 flags.
+            $ficBody = @{
+                name      = 'entralint-bad-fic'
+                issuer    = 'https://token.actions.githubusercontent.com'
+                subject   = '*'
+                audiences = @('api://AzureADTokenExchange')
+            }
+            $ficResp = Invoke-MgAgent -Method POST -Uri "$script:GraphBase/applications/$($created['AgentBP-BadFIC'].id)/federatedIdentityCredentials" `
+                -Body $ficBody -IgnoreError
+            if ($ficResp) {
+                Write-Host "  [agent_015] Added wildcard-subject federated credential to BadFIC blueprint" -ForegroundColor Green
+            } else {
+                Write-Warning "  [agent_015] Tenant rejected the federated credential; check will PASS."
+            }
+        }
+    }
+
     # Each blueprint application needs a corresponding servicePrincipal
     # ("blueprint principal") before any agentIdentity can reference it.
     foreach ($slug in @($created.Keys)) {
@@ -593,23 +632,84 @@ function Seed-AgentIdentities {
         }
     }
 
+    # Sponsored agents (baseline + a no-sponsor variant for entraid_agent_018).
+    $agentObjs = @{}
     foreach ($pair in @(
-            @{ slug = 'Agent-Good';     bp = 'AgentBP-Good' },
-            @{ slug = 'Agent-NoDesc';   bp = 'AgentBP-NoDesc' },
-            @{ slug = 'Agent-Overpriv'; bp = 'AgentBP-Overpriv' }
+            @{ slug = 'Agent-Good';      bp = 'AgentBP-Good';     sponsor = $true },
+            @{ slug = 'Agent-NoDesc';    bp = 'AgentBP-NoDesc';   sponsor = $true },
+            @{ slug = 'Agent-Overpriv';  bp = 'AgentBP-Overpriv'; sponsor = $true },
+            # entraid_agent_018 (LOW): agent created without any sponsor.
+            @{ slug = 'Agent-NoSponsor'; bp = 'AgentBP-NoSponsor'; sponsor = $false },
+            # entraid_agent_013 (HIGH): agent that will receive a high-risk delegated grant.
+            @{ slug = 'Agent-Delegated'; bp = 'AgentBP-Overpriv'; sponsor = $true },
+            # entraid_agent_017 (MEDIUM): agent that will be disabled while retaining access.
+            @{ slug = 'Agent-Disabled';  bp = 'AgentBP-Overpriv'; sponsor = $true }
         )) {
         $bp = $created[$pair.bp]
         if (-not $bp) { continue }
         $name = New-DemoName -Slug $pair.slug
         if ($PSCmdlet.ShouldProcess($name, 'Create agent identity')) {
+            $body = @{ displayName = $name; agentIdentityBlueprintId = $bp.id }
+            if ($pair.sponsor) { $body['sponsors@odata.bind'] = @($sponsorUri) }
             $resp = Invoke-MgAgent -Method POST -Uri "$script:GraphBase/servicePrincipals/microsoft.graph.agentIdentity" `
-                -Body @{ displayName = $name; agentIdentityBlueprintId = $bp.id; 'sponsors@odata.bind' = @($sponsorUri) } -IgnoreError
+                -Body $body -IgnoreError
             if ($resp -and $resp.id) {
                 Add-StateObject -Kind agentIdentities -Obj ([pscustomobject]@{ id = $resp.id; displayName = $name })
+                $agentObjs[$pair.slug] = $resp
                 Write-Host "  [agent] Created agent '$name'" -ForegroundColor Green
             }
         }
     }
+
+    # entraid_agent_013 (HIGH): grant the agent a high-risk delegated scope
+    # (Mail.ReadWrite) tenant-wide so it shows up in oauth2PermissionGrants.
+    if ($agentObjs['Agent-Delegated'] -and $graphSpId) {
+        if ($PSCmdlet.ShouldProcess($agentObjs['Agent-Delegated'].id, 'Grant high-risk delegated scope Mail.ReadWrite')) {
+            $grantBody = @{
+                clientId    = $agentObjs['Agent-Delegated'].id
+                consentType = 'AllPrincipals'
+                resourceId  = $graphSpId
+                scope       = 'Mail.ReadWrite'
+            }
+            # Admin-consent grants need broader directory rights than the narrow
+            # agent Graph session carries, so use the az CLI token here.
+            $grantResp = Invoke-Graph -Method POST -Uri "$script:GraphBase/oauth2PermissionGrants" -Body $grantBody -IgnoreError
+            if ($grantResp) {
+                Write-Host "  [agent_013] Granted delegated Mail.ReadWrite to 'Agent-Delegated'" -ForegroundColor Green
+            } else {
+                Write-Warning "  [agent_013] Could not grant delegated scope (needs Global Admin / Cloud App Admin); check will PASS."
+            }
+        }
+    }
+
+    # entraid_agent_017 (MEDIUM): assign an app role to the agent, then disable
+    # it so it retains access while accountEnabled=false.
+    if ($agentObjs['Agent-Disabled'] -and $graphSpId) {
+        if ($PSCmdlet.ShouldProcess($agentObjs['Agent-Disabled'].id, 'Assign app role then disable agent')) {
+            $araBody = @{
+                principalId = $agentObjs['Agent-Disabled'].id
+                resourceId  = $graphSpId
+                appRoleId   = 'df021288-bdef-4463-88db-98f22de89214'  # User.Read.All (application)
+            }
+            # App-role assignment needs directory write rights (az token); the
+            # accountEnabled patch targets an agent SP so it uses the agent session.
+            $araResp = Invoke-Graph -Method POST -Uri "$script:GraphBase/servicePrincipals/$($agentObjs['Agent-Disabled'].id)/appRoleAssignments" `
+                -Body $araBody -IgnoreError
+            Invoke-MgAgent -Method PATCH -Uri "$script:GraphBase/servicePrincipals/$($agentObjs['Agent-Disabled'].id)" `
+                -Body @{ accountEnabled = $false } -IgnoreError | Out-Null
+            if ($araResp) {
+                Write-Host "  [agent_017] Assigned app role and disabled 'Agent-Disabled'" -ForegroundColor Green
+            } else {
+                Write-Warning "  [agent_017] Could not assign app role (needs Global Admin / privileged role); check may PASS."
+            }
+        }
+    }
+
+    # NOTE: entraid_agent_016 (orphaned blueprint) cannot be seeded reliably in
+    # a live tenant - it requires an agent that references a blueprint id which
+    # no longer exists. Graph rejects creating a dangling reference, and the
+    # teardown deletes blueprints and agents together. Exercise 016 via the
+    # unit tests / a JSON fixture instead.
 }
 
 # ---------------------------------------------------------------------------

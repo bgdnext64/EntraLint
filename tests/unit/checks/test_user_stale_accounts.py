@@ -1,4 +1,6 @@
-"""Tests for entraid_user_003 — Stale user accounts."""
+"""Tests for entraid_user_003 - Stale user accounts."""
+
+from datetime import UTC, datetime, timedelta
 
 from entralint.checks.users.user_stale_accounts.user_stale_accounts import (
     UserStaleAccounts,
@@ -6,6 +8,21 @@ from entralint.checks.users.user_stale_accounts.user_stale_accounts import (
 from entralint.core.check import Status
 from entralint.core.context import TenantContext
 from entralint.core.models import User
+
+
+def _days_ago(days: int) -> str:
+    """Return an ISO-8601 UTC timestamp ``days`` before now.
+
+    Dates are computed relative to the current time so the tests do not
+    silently break as real time passes the 90-day stale threshold.
+    """
+    dt = datetime.now(UTC) - timedelta(days=days)
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# Well inside / well outside the 90-day stale threshold.
+_RECENT = _days_ago(10)
+_STALE = _days_ago(200)
 
 
 def _ctx(**kwargs) -> TenantContext:
@@ -27,7 +44,7 @@ def test_pass_recent_sign_in():
             id="u1", display_name="Active User",
             account_enabled=True, user_type="Member",
             sign_in_activity={
-                "lastSignInDateTime": "2026-03-20T10:00:00Z",
+                "lastSignInDateTime": _RECENT,
             },
         ),
     ])
@@ -42,7 +59,7 @@ def test_fail_stale_user():
             id="u1", display_name="Old User",
             account_enabled=True, user_type="Member",
             sign_in_activity={
-                "lastSignInDateTime": "2025-01-01T10:00:00Z",
+                "lastSignInDateTime": _STALE,
             },
         ),
     ])
@@ -58,14 +75,14 @@ def test_ignores_disabled_users():
             id="u1", display_name="Disabled User",
             account_enabled=False, user_type="Member",
             sign_in_activity={
-                "lastSignInDateTime": "2024-01-01T10:00:00Z",
+                "lastSignInDateTime": _STALE,
             },
         ),
         User(
             id="u2", display_name="Active User",
             account_enabled=True, user_type="Member",
             sign_in_activity={
-                "lastSignInDateTime": "2026-03-20T10:00:00Z",
+                "lastSignInDateTime": _RECENT,
             },
         ),
     ])
@@ -80,14 +97,14 @@ def test_ignores_guest_users():
             id="u1", display_name="Guest",
             account_enabled=True, user_type="Guest",
             sign_in_activity={
-                "lastSignInDateTime": "2024-01-01T10:00:00Z",
+                "lastSignInDateTime": _STALE,
             },
         ),
         User(
             id="u2", display_name="Member",
             account_enabled=True, user_type="Member",
             sign_in_activity={
-                "lastSignInDateTime": "2026-03-20T10:00:00Z",
+                "lastSignInDateTime": _RECENT,
             },
         ),
     ])

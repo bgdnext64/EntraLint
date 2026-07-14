@@ -18,6 +18,7 @@ from entralint.core.check import (
 
 if TYPE_CHECKING:
     from entralint.core.context import TenantContext
+    from entralint.core.models import AgentIdentity
 
 _METADATA_PATH = (
     Path(__file__).parent / "agent_stale_credentials.metadata.json"
@@ -51,8 +52,36 @@ def _load_metadata() -> CheckMetadata:
     )
 
 
+def _parse_dt(value: str | None) -> datetime | None:
+    """Parse an ISO-8601 timestamp, tolerating a trailing 'Z'."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _last_sign_in(agent: AgentIdentity) -> datetime | None:
+    """Return the most recent sign-in timestamp for an agent, if available.
+
+    Uses ``signInActivity`` when the Graph surface exposes it for agent
+    service principals, considering both interactive and non-interactive
+    sign-ins. Returns ``None`` when no telemetry is present.
+    """
+    activity = agent.sign_in_activity
+    if not activity:
+        return None
+    candidates = [
+        _parse_dt(activity.get("lastSignInDateTime")),
+        _parse_dt(activity.get("lastNonInteractiveSignInDateTime")),
+    ]
+    valid = [c for c in candidates if c is not None]
+    return max(valid) if valid else None
+
+
 class AgentStaleCredentials(BaseCheck):
-    """Flags enabled agents older than STALE_DAYS."""
+    """Flags stale enabled agents by last sign-in, falling back to age."""
 
     metadata = _load_metadata()
 
@@ -61,24 +90,46 @@ class AgentStaleCredentials(BaseCheck):
 
     def execute(self, context: TenantContext) -> list[Finding]:
         findings: list[Finding] = []
-        cutoff = datetime.now(tz=UTC) - timedelta(days=STALE_DAYS)
+        now = datetime.now(tz=UTC)
+        cutoff = now - timedelta(days=STALE_DAYS)
 
         for agent in context.agent_identities:
             if not agent.account_enabled:
                 continue
-            if not agent.created_date_time:
+
+            # Prefer real sign-in telemetry when present; otherwise fall
+            # back to creation date as an age-based proxy.
+            last_active = _last_sign_in(agent)
+            if last_active is not None:
+                if last_active >= cutoff:
+                    continue
+                idle_days = (now - last_active).days
+                findings.append(Finding(
+                    check_id=self.metadata.check_id,
+                    check_version=self.metadata.check_version,
+                    status=Status.FAIL,
+                    severity=self.metadata.severity,
+                    resource_type=self.metadata.resource_type,
+                    resource_id=agent.id,
+                    title=(
+                        f"Agent '{agent.display_name}' has no sign-in for "
+                        f"{idle_days} days and is still enabled"
+                    ),
+                    description=(
+                        f"Agent identity last signed in {idle_days} days ago "
+                        f"(threshold: {STALE_DAYS}) and is still enabled. "
+                        f"Disable or remove it if it is no longer in use."
+                    ),
+                    remediation=self.metadata.remediation.recommendation,
+                ))
                 continue
-            try:
-                created = datetime.fromisoformat(
-                    agent.created_date_time.replace("Z", "+00:00")
-                )
-            except (ValueError, AttributeError):
+
+            created = _parse_dt(agent.created_date_time)
+            if created is None:
                 continue
 
             if created < cutoff:
-                age_days = (
-                    datetime.now(tz=UTC) - created
-                ).days
+                age_days = (now - created).days
                 findings.append(Finding(
                     check_id=self.metadata.check_id,
                     check_version=self.metadata.check_version,
@@ -93,8 +144,9 @@ class AgentStaleCredentials(BaseCheck):
                     description=(
                         f"Agent identity was created {age_days} "
                         f"days ago (threshold: {STALE_DAYS}) and "
-                        f"is still enabled. Review sign-in logs to "
-                        f"confirm active usage."
+                        f"is still enabled. No sign-in telemetry was "
+                        f"available; review sign-in logs to confirm "
+                        f"active usage."
                     ),
                     remediation=self.metadata.remediation.recommendation,
                 ))

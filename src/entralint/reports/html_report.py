@@ -499,7 +499,7 @@ _TEMPLATE = """\
 <p>Think of it as ESLint or Ruff, but for your identity configuration instead of your code.</p>
 
 <div class="card-grid">
-  <div class="info-card"><h4>82 Security Checks</h4><p>Covering 9 categories from Conditional Access to AI Agent Identities</p></div>
+  <div class="info-card"><h4>88 Security Checks</h4><p>Covering 8 categories from Conditional Access to AI Agent Identities</p></div>
   <div class="info-card"><h4>Compliance Mapping</h4><p>CIS Microsoft 365 v5, CISA SCuBA (BOD 25-01), NIST 800-53</p></div>
   <div class="info-card ok"><h4>Read-Only Access</h4><p>EntraLint never modifies your tenant &mdash; it only reads configuration data</p></div>
   <div class="info-card warn"><h4>CI/CD Ready</h4><p>SARIF output for GitHub Code Scanning, exit codes for pipeline gates</p></div>
@@ -537,12 +537,15 @@ _TEMPLATE = """\
 </table>
 
 <h2>Agentic Identity Checks</h2>
-<p>EntraLint is the first security scanner to provide dedicated checks for <strong>Microsoft Entra Agent ID</strong> &mdash; the GA platform (March 2026) that gives AI agents their own first-class identity type. These 12 checks cover:</p>
+<p>EntraLint is the first security scanner to provide dedicated checks for <strong>Microsoft Entra Agent ID</strong> &mdash; the GA platform (March 2026) that gives AI agents their own first-class identity type. These 18 checks cover:</p>
 <ul>
   <li>Agents holding dangerous or blocked permissions (e.g., <code>Files.ReadWrite.All</code>, <code>RoleManagement.ReadWrite.Directory</code>)</li>
   <li>Blueprints using <code>allAllowedScopes</code> inheritance (agents inherit any permission)</li>
-  <li>Orphaned agents with no owner or sponsor</li>
-  <li>Stale agent identities with valid credentials</li>
+  <li>Multi-tenant agent blueprints exposed to external tenants</li>
+  <li>Federated identity credential (FIC) misconfigurations, such as wildcard subjects</li>
+  <li>Agent service principals granted broad delegated permissions</li>
+  <li>Orphaned agents and blueprints with no owner or sponsor</li>
+  <li>Disabled agents that still hold access, and stale agent identities with valid credentials</li>
   <li>External (third-party) agent blueprints operating in your tenant</li>
   <li>Agents using client secrets instead of federated credentials</li>
 </ul>

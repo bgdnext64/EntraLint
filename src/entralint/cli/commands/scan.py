@@ -391,6 +391,14 @@ async def _fetch_and_scan(
                             InheritablePermission.model_validate(ip)
                             for ip in ip_resp.get("value", [])
                         ]
+                    with contextlib.suppress(Exception):
+                        fic_resp = await graph.get(
+                            f"/applications/{bp.id}"
+                            "/federatedIdentityCredentials"
+                        )
+                        bp.federated_identity_credentials = (
+                            fic_resp.get("value", [])
+                        )
                     agent_blueprints.append(bp)
                 granted_permissions.add("AgentIdentity.Read.All")
                 _ok(
@@ -434,9 +442,15 @@ async def _fetch_and_scan(
             # --- Agent Identities ---
             agent_identities: list[AgentIdentity] = []
             try:
-                raw_agents = await graph.get_all_pages(
+                raw_agents = await _fetch_with_select_fallback(
+                    graph,
                     "/servicePrincipals/microsoft.graph"
-                    ".agentIdentity"
+                    ".agentIdentity?$select=id,displayName,appId,"
+                    "agentIdentityBlueprintId,accountEnabled,"
+                    "servicePrincipalType,createdByAppId,createdDateTime,"
+                    "disabledByMicrosoftStatus,tags,signInActivity",
+                    "/servicePrincipals/microsoft.graph"
+                    ".agentIdentity",
                 )
                 for ag_raw in raw_agents:
                     ag = AgentIdentity.model_validate(ag_raw)

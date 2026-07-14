@@ -12,7 +12,7 @@ Identity misconfigurations are one of the most common root causes of cloud breac
 
 Microsoft provides powerful built-in tools like Identity Secure Score and Entra Recommendations to track your tenant's security posture. EntraLint extends that coverage into your engineering workflow — adding CI/CD integration, deeper checks across applications and service principals, compliance framework mappings, and coverage for the newest Entra ID surfaces:
 
-- **Finds misconfigurations automatically** — 82 checks cover conditional access, MFA, privileged roles, app registrations, service principals, guest accounts, organization settings, cross-tenant access, and AI agent identities
+- **Finds misconfigurations automatically** — 88 checks cover conditional access, MFA, privileged roles, app registrations, service principals, guest accounts, organization settings, cross-tenant access, and AI agent identities
 - **Maps to compliance frameworks** — Every finding references CIS Microsoft 365 Foundations Benchmark v5, CISA SCuBA (BOD 25-01), and/or NIST 800-53 controls
 - **Fits into your workflow** — Run it locally during development, in CI/CD pipelines via SARIF output, or as a scheduled audit tool
 - **Requires read-only access** — EntraLint never modifies your tenant. It only reads configuration data through the Microsoft Graph API
@@ -24,11 +24,11 @@ It's a fair question. Microsoft ships excellent built-in tools — Identity Secu
 | Capability | Identity Secure Score | Entra Recommendations | Defender for Identity | EntraLint |
 |---|---|---|---|---|
 | **Where it runs** | Azure portal dashboard | Azure portal dashboard | Requires sensor on DCs / Entra Connect | CLI, CI/CD pipelines, GitHub Actions |
-| **Focus area** | ~20 high-level Entra ID settings | ~50 Entra ID + hybrid recommendations | On-premises AD, Kerberos, NTLM, certificates | Cloud-native Entra ID configuration (82 checks) |
+| **Focus area** | ~20 high-level Entra ID settings | ~50 Entra ID + hybrid recommendations | On-premises AD, Kerberos, NTLM, certificates | Cloud-native Entra ID configuration (88 checks) |
 | **App & SP credential hygiene** | — | Expiring creds only | — | 18 checks: expired, long-lived, dual-type, high-privilege grants, orphaned owners, stale SPs |
 | **Conditional Access depth** | MFA, legacy auth, risk policies | Same as Secure Score | — | 14 checks: device code flow, session controls, exclusion sprawl, guest targeting, device compliance for admins |
 | **Privileged role analysis** | GA count, least privilege | Same | Lateral movement paths (on-prem) | 10 checks: PIM usage, break-glass accounts, guests in roles, SPs in roles, multi-role users, per-role caps |
-| **Agentic identity (Entra Agent ID)** | — | — | — | 12 dedicated checks (first scanner to cover this) |
+| **Agentic identity (Entra Agent ID)** | — | — | — | 18 dedicated checks (first scanner to cover this) |
 | **Cross-tenant & guest access** | — | — | — | 8 checks: inbound/outbound trust, MFA trust, guest invite settings, guest CA coverage |
 | **Output formats** | Portal only | Portal only | Portal / Sentinel | Table, JSON, SARIF, HTML |
 | **CI/CD gating** | No | No | No | `--fail-on critical` exits non-zero |
@@ -39,14 +39,14 @@ It's a fair question. Microsoft ships excellent built-in tools — Identity Secu
 
 ### What overlaps and what doesn't
 
-Microsoft's built-in tools and EntraLint are largely complementary — there's minimal redundancy. 13 of EntraLint's 82 checks overlap with what Secure Score and Entra Recommendations already cover, while the remaining **69 checks extend into areas** those tools weren't designed to address (CI/CD-oriented linting, deep app/SP credential analysis, cross-tenant trust, and agentic identity).
+Microsoft's built-in tools and EntraLint are largely complementary — there's minimal redundancy. 13 of EntraLint's 88 checks overlap with what Secure Score and Entra Recommendations already cover, while the remaining **75 checks extend into areas** those tools weren't designed to address (CI/CD-oriented linting, deep app/SP credential analysis, cross-tenant trust, and agentic identity).
 
 | Coverage source | Overlapping checks | What's covered |
 |---|---|---|
 | **Identity Secure Score** | 8 checks | MFA for all users, MFA for admins, block legacy auth, sign-in risk policy, user risk policy, restrict user consent, SSPR, Global Admin count |
 | **Entra Recommendations** | 5 additional | Expiring app credentials, unused app credentials, expiring SP credentials, stale user accounts, least-privilege roles |
 | **Defender for Identity** | 0 | Defender for Identity excels at on-premises AD security — EntraLint focuses on the cloud-native Entra ID configuration surface |
-| **Unique to EntraLint** | **69 checks** | Device code flow blocking, persistent browser sessions, named location review, CA exclusion sprawl, guest CA targeting, sign-in frequency for admins, FIDO2/passwordless, banned password lists, number matching, TAP lifetime, certificate-based auth, break-glass accounts, guests/SPs in privileged roles, per-role assignment caps, multi-role detection, app secret lifetime, non-admin app owners with high-priv permissions, excessive delegated permissions, multi-tenant app review, disabled SPs with credentials, third-party SP permissions, broad delegated grants, dual credential types, cross-tenant trust settings, guest invitation restrictions, app registration restrictions, all 12 agentic identity checks |
+| **Unique to EntraLint** | **75 checks** | Device code flow blocking, persistent browser sessions, named location review, CA exclusion sprawl, guest CA targeting, sign-in frequency for admins, FIDO2/passwordless, banned password lists, number matching, TAP lifetime, certificate-based auth, break-glass accounts, guests/SPs in privileged roles, per-role assignment caps, multi-role detection, app secret lifetime, non-admin app owners with high-priv permissions, excessive delegated permissions, multi-tenant app review, disabled SPs with credentials, third-party SP permissions, broad delegated grants, dual credential types, cross-tenant trust settings, guest invitation restrictions, app registration restrictions, all 18 agentic identity checks |
 
 ### When to use what
 
@@ -62,22 +62,28 @@ EntraLint is not a replacement for Secure Score — it's a complement. Run both.
 
 EntraLint requires Python 3.11+ and [uv](https://docs.astral.sh/uv/) (a fast Python package manager).
 
+The fastest way to run EntraLint is to **reuse your existing Azure CLI sign-in** — no app registration, no client secret, nothing to configure in Entra ID.
+
 ```bash
-# 1. Clone the repository
+# 1. Clone and install
 git clone https://github.com/bgdnext64/EntraLint.git
 cd EntraLint
-
-# 2. Install dependencies
 uv sync
 
-# 3. Authenticate to your tenant
-uv run entralint login
+# 2. Sign in with the Azure CLI (you almost certainly already have this)
+az login --tenant contoso.onmicrosoft.com
 
-# 4. Run a security scan
-uv run entralint scan
+# 3. Tell EntraLint to reuse that sign-in, then scan
+#    PowerShell:
+$env:ENTRALINT_USE_DEFAULT_CREDENTIAL = "true"
+#    bash / zsh:
+#    export ENTRALINT_USE_DEFAULT_CREDENTIAL=true
+uv run entralint scan --tenant contoso.onmicrosoft.com
 ```
 
-That's it. EntraLint authenticates via device-code flow (you'll see a URL and code to enter in your browser), scans your tenant's configuration through the Microsoft Graph API, and prints the results directly in your terminal.
+That's it. EntraLint reuses the Microsoft Graph access your `az login` session already has, scans your tenant's configuration through the Microsoft Graph API, and prints the results directly in your terminal. **You do not need to register an application** for this path.
+
+Prefer an interactive browser login, or need an unattended identity for CI/CD? See [Authentication](#authentication) for every option — including device-code sign-in and a dedicated read-only app registration.
 
 ### What You'll See
 
@@ -88,7 +94,7 @@ most under-tooled identity surface in Entra ID:
 ```
 ╭─ EntraLint v0.1.0 ──────────────────────────────────────────────────────╮
 │ Tenant: contoso.onmicrosoft.com                                         │
-│ Checks: 82 | Framework: All                                             │
+│ Checks: 88 | Framework: All                                             │
 ╰─────────────────────────────────────────────────────────────────────────╯
 
 Collecting data from Microsoft Graph API...
@@ -144,9 +150,10 @@ caught up yet. Here's why each line above matters:
 | **`entraid_agent_010` — No inheritable restrictions** | The blueprint doesn't define a permission ceiling, so future agents created from it can request whatever they want. Best practice is to declare the maximum permission set at the blueprint level. |
 | **`entraid_agent_012` — No description** | Audit hygiene only, but matters at scale: when a tenant has dozens of agents, "what does this one do?" needs a fast answer. |
 
-EntraLint ships **all 12** Entra Agent ID checks today, covering
+EntraLint ships **all 18** Entra Agent ID checks today, covering
 permissions, blueprint inheritance, ownership, credentials, lifecycle,
-and origin/creator. See [`uv run entralint list-checks --category AgentIdentity`](#cli-reference)
+multi-tenant exposure, federated-credential hygiene, and origin/creator.
+See [`uv run entralint list-checks --category AgentIdentity`](#cli-reference)
 for the full list.
 
 ### Saving Reports
@@ -164,9 +171,86 @@ uv run entralint scan -f json --output-file results.json
 uv run entralint scan -f sarif --output-file results.sarif
 ```
 
-## Security Checks (82)
+## Authentication
 
-EntraLint ships with 82 built-in checks organized into 9 categories:
+EntraLint offers several ways to authenticate, from zero-setup local scans to unattended CI/CD. Pick the one that matches how you're running it.
+
+### Do I need to register an app?
+
+**No — not for local, interactive use.** If you can already run `az login` against your tenant, EntraLint can reuse that session (Option 1 below). This is the recommended way to try EntraLint and to run it from your own workstation.
+
+You **only** need a dedicated app registration when you want:
+
+- an unattended, non-interactive identity for CI/CD pipelines or scheduled scans, or
+- a strictly scoped read-only identity that's independent of any user account, or
+- a persistent cached browser login (device-code flow).
+
+### Option 1 — Reuse your `az login` session (no app registration)
+
+Best for: local development, ad-hoc scans, trying EntraLint.
+
+```bash
+az login --tenant <your-tenant>
+
+# PowerShell
+$env:ENTRALINT_USE_DEFAULT_CREDENTIAL = "true"
+# bash / zsh
+# export ENTRALINT_USE_DEFAULT_CREDENTIAL=true
+
+uv run entralint scan --tenant <your-tenant>
+```
+
+EntraLint uses `DefaultAzureCredential` under the hood, so this same setting also transparently picks up a **managed identity** (when running on Azure) or **workload identity federation** (GitHub Actions OIDC) with no code changes.
+
+> **Scope note:** this path inherits whatever Microsoft Graph permissions your Azure CLI sign-in already has. That covers most checks, but a few policy-heavy checks (for example Security Defaults or the authentication-methods policy) may be skipped if your account hasn't been granted `Policy.Read.All`. For complete coverage, use a dedicated app registration (Option 3) with all [required permissions](#permissions) consented.
+
+### Option 2 — Device-code sign-in (interactive, needs a public app registration)
+
+Best for: interactive use where you want a persistent cached login and full permission coverage.
+
+Device-code flow needs a **public client** app registration whose ID you supply via `ENTRALINT_CLIENT_ID` (or `--client-id`). Once that's set:
+
+```bash
+export ENTRALINT_CLIENT_ID="<your-public-app-client-id>"   # or pass --client-id
+uv run entralint login --tenant <your-tenant>              # prints a URL + code to enter in a browser
+uv run entralint scan  --tenant <your-tenant>              # reuses the cached token
+```
+
+The token is cached per-tenant under `~/.entralint/cache/`, so you sign in once until it expires.
+
+### Option 3 — App registration with client secret or certificate (CI/CD, unattended)
+
+Best for: pipelines and scheduled scans with a scoped, read-only identity.
+
+Register an app, grant it the [required read-only permissions](#permissions), then provide the credentials via environment variables:
+
+```bash
+export ENTRALINT_TENANT_ID="<tenant-id>"
+export ENTRALINT_CLIENT_ID="<app-client-id>"
+export ENTRALINT_CLIENT_SECRET="<client-secret>"          # or ENTRALINT_CLIENT_CERTIFICATE_PATH=/path/to/cert.pem
+uv run entralint scan --fail-on high -f sarif --output-file results.sarif
+```
+
+### How EntraLint picks a method
+
+`entralint scan` auto-detects the authentication method from the environment, in this priority order:
+
+1. **Workload identity federation** — if `AZURE_FEDERATED_TOKEN_FILE` / GitHub OIDC is present
+2. **Managed identity** — if `IDENTITY_ENDPOINT` is present (Azure-hosted)
+3. **Explicit `DefaultAzureCredential`** — if `ENTRALINT_USE_DEFAULT_CREDENTIAL=true` (the `az login` path)
+4. **Client credentials** — if `ENTRALINT_CLIENT_SECRET` or `ENTRALINT_CLIENT_CERTIFICATE_PATH` is set
+5. **Cached device-code token** — falls back to the token saved by `entralint login`
+
+| Method | App registration? | Interactive? | Best for |
+|---|---|---|---|
+| `az login` + `ENTRALINT_USE_DEFAULT_CREDENTIAL` | **No** | Yes (via `az`) | Local, ad-hoc scans |
+| Managed identity / WIF | Federated (no secret) | No | Azure-hosted, GitHub Actions OIDC |
+| Device code (`entralint login`) | Yes (public client) | Yes | Persistent local login |
+| Client secret / certificate | Yes (confidential) | No | CI/CD, scheduled scans |
+
+## Security Checks (88)
+
+EntraLint ships with 88 built-in checks organized into 8 categories:
 
 | Category | Count | Severities | What It Covers |
 |---|---|---|---|
@@ -177,7 +261,7 @@ EntraLint ships with 82 built-in checks organized into 9 categories:
 | Service Principals | 9 | 1 High, 6 Medium, 2 Low | Expired credentials, high-privilege grants, dual credential types, stale SPs |
 | Users & Guests | 9 | 1 Critical, 2 High, 3 Medium, 1 Low | Stale accounts, guest access level, MFA registration, disabled users with roles |
 | Organization | 9 | 1 High, 7 Medium, 1 Low | Security defaults, verified domains, cross-tenant trust settings |
-| Agentic Identity | 12 | 2 Critical, 4 High, 5 Medium, 1 Low | AI agent permissions, blueprint scope inheritance, blocked permission enforcement, orphaned agents, stale agents |
+| Agentic Identity | 18 | 2 Critical, 7 High, 7 Medium, 2 Low | AI agent permissions, blueprint scope inheritance, blocked permission enforcement, multi-tenant blueprints, federated-credential misconfig, delegated high-privilege grants, orphaned/disabled agents, stale agents |
 
 Every check includes:
 
@@ -188,12 +272,15 @@ Every check includes:
 
 ### Agentic Identity Checks
 
-EntraLint is the first security scanner to provide dedicated checks for **Microsoft Entra Agent ID** — the identity platform that gives AI agents their own first-class identity type in Entra ID (Graph API v1.0 since March 2026). These 12 checks cover agent blueprints, blueprint principals, and agent identity instances, detecting issues like:
+EntraLint is the first security scanner to provide dedicated checks for **Microsoft Entra Agent ID** — the identity platform that gives AI agents their own first-class identity type in Entra ID (Graph API v1.0 since March 2026). These 18 checks cover agent blueprints, blueprint principals, and agent identity instances, detecting issues like:
 
 - Agents holding dangerous or blocked permissions (e.g., `Files.ReadWrite.All`, `RoleManagement.ReadWrite.Directory`)
 - Blueprints using `allAllowedScopes` inheritance (allows agents to inherit any permission)
-- Orphaned agents with no owner or sponsor
-- Stale agent identities with valid credentials
+- Multi-tenant agent blueprints exposed to external tenants
+- Federated identity credential (FIC) misconfigurations, such as wildcard subjects
+- Agent service principals granted broad delegated permissions
+- Orphaned agents and blueprints with no owner or sponsor
+- Disabled agents that still hold access, and stale agent identities with valid credentials
 - External (third-party) agent blueprints operating in your tenant
 - Agents using client secrets instead of federated credentials
 
@@ -676,7 +763,7 @@ uv sync
 # Run the CLI
 uv run entralint version
 
-# Run the test suite (467 tests)
+# Run the test suite (503 tests)
 uv run pytest
 
 # Lint
@@ -704,7 +791,7 @@ src/entralint/
 ├── core/         # Check engine, Pydantic models, TenantContext
 ├── auth/         # MSAL authentication (device code, client credentials)
 ├── graph/        # Graph API client, caching, pagination, rate limiting
-├── checks/       # 82 built-in security checks (auto-discovered)
+├── checks/       # 88 built-in security checks (auto-discovered)
 │   ├── conditional_access/
 │   ├── authentication/
 │   ├── privileged_roles/
@@ -756,14 +843,17 @@ checks across 4 categories:
 | Member user assigned `Application Administrator`              | `entraid_role_009` (MEDIUM)    |
 | Member user assigned `Cloud Application Administrator`        | `entraid_role_010` (MEDIUM)    |
 
-**Agent identities — `-Agent` switch (independent of tier).** Mirrors
+**Agent identities — `-Agent` switch (independent of tier).** Builds on
 the manual [`scripts/create_test_agents.ps1`](scripts/create_test_agents.ps1)
 but tagged for teardown:
 
-- 4 agent identity blueprints: well-formed / no-description / overprivileged / secret-based
-- 3 agent identities (one per non-secret blueprint)
+- 7 agent identity blueprints: well-formed / no-description / overprivileged / secret-based / multi-tenant / misconfigured-FIC / no-sponsor
+- A blueprint principal for each, plus 6 agent identities — including a no-sponsor agent, one granted a high-risk delegated scope (`Mail.ReadWrite`), and one disabled while retaining an app role
 
-These trigger `entraid_agent_005`, `_008`, `_010`, `_012`.
+These trigger `entraid_agent_008`, `_010`, `_012`, `_013`, `_014`, `_015`,
+`_017`, and `_018`. A few (the delegated grant and app-role assignment)
+need Global Administrator / privileged-role rights on the signed-in
+account; the script logs a warning and continues if they're rejected.
 
 ### How safety works
 

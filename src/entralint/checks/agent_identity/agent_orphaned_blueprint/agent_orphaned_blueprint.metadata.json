@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_agent_016",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure agent identities reference an existing blueprint",
+    "ServiceName": "AgentIdentity",
+    "Severity": "MEDIUM",
+    "ResourceType": "AgentIdentity",
+    "Description": "Checks that every agent identity whose agentIdentityBlueprintId is set refers to a blueprint that still exists in the tenant. Agents whose parent blueprint has been deleted are orphaned and escape the governance and inheritable-permission restrictions the blueprint would enforce.",
+    "Risk": "An orphaned agent no longer inherits the guardrails (inheritable permission restrictions, ownership, lifecycle) defined by its blueprint. It can persist unmanaged after the blueprint is retired, becoming a forgotten identity with standing permissions.",
+    "Remediation": {
+        "Recommendation": "Review the orphaned agent. Either recreate or reassign an appropriate blueprint, or disable and delete the agent if it is no longer needed.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["CM-8"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/servicePrincipals/microsoft.graph.agentIdentity"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Only evaluated when at least one blueprint was collected, to avoid false positives when blueprint enumeration was skipped or unauthorized."
+}

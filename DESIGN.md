@@ -1040,7 +1040,7 @@ EntraLint check `agent_003` specifically validates that no agent identity holds 
 
 ### Security Check Library (Agent Category)
 
-The agent category adds 12 checks targeting agent-specific risks. These checks operate on the typed `agentIdentity`, `agentIdentityBlueprint`, and `agentIdentityBlueprintPrincipal` resources returned from the GA endpoints.
+The agent category adds 18 checks targeting agent-specific risks. These checks operate on the typed `agentIdentity`, `agentIdentityBlueprint`, and `agentIdentityBlueprintPrincipal` resources returned from the GA endpoints.
 
 | Check ID | Severity | Title | What It Detects |
 |---|---|---|---|
@@ -1494,7 +1494,7 @@ class AgentNoAccountability(BaseCheck):
 
 ### Updated Check Distribution
 
-With the agent category, the total check count increases to 82:
+With the agent category, the total check count increases to 83:
 
 | Category | Critical | High | Medium | Low | Total |
 |----------|----------|------|--------|-----|-------|
@@ -1506,8 +1506,8 @@ With the agent category, the total check count increases to 82:
 | Users & Guests | 1 | 2 | 3 | 1 | **7** |
 | Organization | 0 | 2 | 3 | 0 | **5** |
 | Cross-Tenant & B2B | 0 | 2 | 3 | 0 | **5** |
-| **Agentic Identity** | **2** | **4** | **5** | **1** | **12** |
-| **Total** | **14** | **29** | **30** | **4** | **81** |
+| **Agentic Identity** | **2** | **7** | **7** | **2** | **18** |
+| **Total** | **14** | **32** | **32** | **5** | **83** |
 
 ### Framework Mappings
 

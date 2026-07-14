@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_agent_015",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure agent blueprint federated credentials are securely configured",
+    "ServiceName": "AgentIdentity",
+    "Severity": "HIGH",
+    "ResourceType": "AgentIdentityBlueprint",
+    "Description": "Inspects the federated identity credentials (FIC) declared on agent blueprints for insecure configuration: a wildcard or empty subject, a non-HTTPS or empty issuer, or a missing token-exchange audience. Complements the secrets-versus-federated-credentials check by validating that the federated credentials themselves are sound.",
+    "Risk": "A federated identity credential with an overly broad subject (for example, an empty value or a wildcard) or an untrusted issuer lets an attacker exchange an external token for agent access, impersonating the agent without any stored secret. Misconfigured audiences can similarly permit tokens minted for other purposes to be accepted.",
+    "Remediation": {
+        "Recommendation": "Set a specific, non-wildcard subject that matches the exact external workload identity. Use an HTTPS issuer you control and trust. Ensure the audience is set to the Entra token-exchange audience (api://AzureADTokenExchange). Remove unused federated credentials.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/federatedidentitycredential"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["IA-5", "AC-3"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/applications/{id}/federatedIdentityCredentials"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "FIC entries are collected into AgentIdentityBlueprint.federated_identity_credentials as raw dicts with keys: name, subject, issuer, audiences."
+}

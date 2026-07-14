@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_agent_018",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure agent identities and blueprints have a designated sponsor",
+    "ServiceName": "AgentIdentity",
+    "Severity": "LOW",
+    "ResourceType": "AgentIdentity",
+    "Description": "Checks that every agent identity and blueprint has at least one sponsor. Sponsors are the Entra Agent ID native accountability construct that names a responsible party. This is stricter than the owner-or-sponsor accountability check: it requires a sponsor specifically.",
+    "Risk": "Without a designated sponsor there is no clearly named party responsible for an agent's ongoing review, recertification, and eventual decommissioning. Ownership alone (which may be another application) does not establish human accountability.",
+    "Remediation": {
+        "Recommendation": "Assign at least one sponsor to each agent identity and blueprint, ideally a person or group accountable for its lifecycle. Establish a periodic recertification process tied to the sponsor.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentity"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["PS-2", "AC-2"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/servicePrincipals/microsoft.graph.agentIdentity", "/applications/microsoft.graph.agentIdentityBlueprint"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Distinct from entraid_agent_006 (owner OR sponsor). This check requires a sponsor specifically and is LOW severity."
+}

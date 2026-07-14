@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_agent_014",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure agent blueprints are single-tenant",
+    "ServiceName": "AgentIdentity",
+    "Severity": "HIGH",
+    "ResourceType": "AgentIdentityBlueprint",
+    "Description": "Checks the signInAudience of each agent identity blueprint. Blueprints configured for AzureADMultipleOrgs or any Microsoft personal-account audience can be provisioned or consented to beyond the home tenant, widening the agent's exposure.",
+    "Risk": "A multi-tenant or personal-account blueprint can be instantiated or consented to outside the home tenant boundary. This expands the attack surface, complicates governance, and can allow untrusted organizations or consumer accounts to derive agents from the blueprint.",
+    "Remediation": {
+        "Recommendation": "Set the blueprint signInAudience to AzureADMyOrg unless cross-tenant agent provisioning is an explicit, reviewed requirement. Where multi-tenant is required, pair it with cross-tenant access policy restrictions and named approvals.",
+        "Url": "https://learn.microsoft.com/en-us/graph/api/resources/agentidentityblueprint"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["AC-3", "AC-4"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/applications/microsoft.graph.agentIdentityBlueprint"],
+    "RequiredPermissions": ["AgentIdentity.Read.All"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "signInAudience values: AzureADMyOrg (single tenant), AzureADMultipleOrgs (multi-tenant), AzureADandPersonalMicrosoftAccount, PersonalMicrosoftAccount."
+}

@@ -321,5 +321,11 @@ class AgentIdentity(BaseModel):
     oauth2_permission_grants: list[dict[str, Any]] = Field(
         default_factory=list, alias="oauth2PermissionGrants"
     )
+    # Populated only when the tenant/Graph surface exposes sign-in telemetry
+    # for agent service principals. When absent, staleness falls back to
+    # createdDateTime.
+    sign_in_activity: dict[str, Any] | None = Field(
+        default=None, alias="signInActivity"
+    )
 
     model_config = {"populate_by_name": True}
