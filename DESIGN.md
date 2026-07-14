@@ -119,7 +119,7 @@ The scan command auto-detects `ENTRALINT_CLIENT_SECRET` or `ENTRALINT_CLIENT_CER
 ```yaml
 # GitHub Actions — using the reusable action
 - name: EntraLint Security Scan
-  uses: bgdnext64/EntraLint@main
+  uses: bgdnext64/EntraLint@v0.1.0
   with:
     tenant-id: ${{ secrets.ENTRALINT_TENANT_ID }}
     client-id: ${{ secrets.ENTRALINT_CLIENT_ID }}
@@ -137,7 +137,7 @@ The scan command auto-detects `ENTRALINT_CLIENT_SECRET` or `ENTRALINT_CLIENT_CER
   run: entralint scan --fail-on critical --quiet -f sarif --output-file results.sarif
 ```
 
-The reusable action (`uses: bgdnext64/EntraLint@main`) handles Python/uv setup, runs the scan, and uploads SARIF to GitHub Code Scanning automatically. See `action.yml` for the full input/output specification.
+The reusable action (`uses: bgdnext64/EntraLint@v0.1.0`) handles Python/uv setup, runs the scan, and uploads SARIF to GitHub Code Scanning automatically. See `action.yml` for the full input/output specification.
 
 ### Flow 3: Managed Identity for Azure-hosted deployments
 

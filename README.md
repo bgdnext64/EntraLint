@@ -394,7 +394,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run EntraLint
-        uses: bgdnext64/EntraLint@main
+        uses: bgdnext64/EntraLint@v0.1.0
         with:
           tenant-id: ${{ secrets.ENTRALINT_TENANT_ID }}
           client-id: ${{ secrets.ENTRALINT_CLIENT_ID }}
@@ -431,7 +431,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Run EntraLint
-        uses: bgdnext64/EntraLint@main
+        uses: bgdnext64/EntraLint@v0.1.0
         with:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           use-default-credential: "true"

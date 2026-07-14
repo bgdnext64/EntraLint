@@ -617,7 +617,7 @@ uv run entralint permissions -f powershell --client-id YOUR_APP_ID
 <p>EntraLint ships as a reusable GitHub Action. Add it to any workflow to scan your tenant on a schedule and see results in GitHub Code Scanning:</p>
 <pre>
 # .github/workflows/entralint.yml
-- uses: bgdnext64/EntraLint@main
+- uses: bgdnext64/EntraLint@v0.1.0
   with:
     tenant-id: ${{ secrets.ENTRALINT_TENANT_ID }}
     client-id: ${{ secrets.ENTRALINT_CLIENT_ID }}
