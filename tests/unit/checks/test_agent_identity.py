@@ -38,13 +38,14 @@ from entralint.checks.agent_identity.agent_no_inheritable_restrictions.agent_no_
     AgentNoInheritableRestrictions,
 )
 from entralint.checks.agent_identity.agent_non_admin_creator.agent_non_admin_creator import (
+    MICROSOFT_FIRST_PARTY_APPS,
     AgentNonAdminCreator,
 )
 from entralint.checks.agent_identity.agent_stale_credentials.agent_stale_credentials import (
     STALE_DAYS,
     AgentStaleCredentials,
 )
-from entralint.core.check import Status
+from entralint.core.check import Severity, Status
 from entralint.core.context import TenantContext
 from entralint.core.models import (
     AgentIdentity,
@@ -54,6 +55,7 @@ from entralint.core.models import (
     AppRoleAssignment,
     InheritablePermission,
     PasswordCredential,
+    ServicePrincipal,
 )
 
 
@@ -312,6 +314,44 @@ class TestAgentNonAdminCreator:
         assert len(findings) == 1
         assert findings[0].status == Status.FAIL
         assert "external-app-id" in findings[0].title
+        # Unknown third-party creators keep the check's default HIGH severity.
+        assert findings[0].severity == Severity.HIGH
+        assert "third-party" in findings[0].title.lower()
+        assert findings[0].raw_data["creator_is_microsoft_first_party"] is False
+        assert findings[0].raw_data["creator_display_name"] == "unknown application"
+
+    def test_fail_third_party_resolves_display_name(self):
+        agent = _agent(created_by_app_id="external-app-id")
+        sp = ServicePrincipal(
+            app_id="external-app-id", display_name="Contoso Widgets"
+        )
+        findings = AgentNonAdminCreator().execute(
+            _ctx(
+                agent_identities=[agent],
+                applications=[],
+                service_principals=[sp],
+            )
+        )
+        assert len(findings) == 1
+        assert findings[0].status == Status.FAIL
+        assert findings[0].severity == Severity.HIGH
+        assert "Contoso Widgets" in findings[0].title
+        assert findings[0].raw_data["creator_display_name"] == "Contoso Widgets"
+
+    def test_first_party_creator_downgraded_to_low(self):
+        graph_cli = next(iter(MICROSOFT_FIRST_PARTY_APPS.keys()))
+        graph_cli_name = MICROSOFT_FIRST_PARTY_APPS[graph_cli]
+        agent = _agent(created_by_app_id=graph_cli)
+        findings = AgentNonAdminCreator().execute(
+            _ctx(agent_identities=[agent], applications=[])
+        )
+        assert len(findings) == 1
+        assert findings[0].status == Status.FAIL
+        assert findings[0].severity == Severity.LOW
+        assert graph_cli_name in findings[0].title
+        assert "self-service" in findings[0].title.lower()
+        assert findings[0].raw_data["creator_is_microsoft_first_party"] is True
+        assert findings[0].raw_data["creator_display_name"] == graph_cli_name
 
     def test_pass_no_creator(self):
         agent = _agent(created_by_app_id=None)
