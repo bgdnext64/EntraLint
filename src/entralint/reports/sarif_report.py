@@ -10,6 +10,7 @@ Spec: https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from entralint.core.check import Finding, Severity, Status
@@ -131,14 +132,37 @@ def _build_result(finding: Finding, rule_id: str) -> dict[str, Any]:
         "message": {"text": message_text},
         "locations": [
             {
+                # GitHub Code Scanning requires a physicalLocation for every
+                # result. Entra findings are not tied to source files, so we
+                # emit a stable synthetic artifact URI representing the scanned
+                # resource and keep the logicalLocation for human-readable detail.
+                "physicalLocation": {
+                    "artifactLocation": {"uri": _synthetic_uri(finding)},
+                    "region": {"startLine": 1},
+                },
                 "logicalLocations": [
                     {
                         "name": finding.resource_id or "tenant",
                         "kind": finding.resource_type or "resource",
                     }
-                ]
+                ],
             }
         ],
     }
 
     return result
+
+
+def _synthetic_uri(finding: Finding) -> str:
+    """Build a stable, filesystem-safe virtual URI for a finding.
+
+    Entra ID findings do not map to files in the repository, but GitHub Code
+    Scanning still requires ``physicalLocation.artifactLocation.uri``. We derive
+    a deterministic path from the resource type and id so related findings group
+    together and alerts remain stable across scans.
+    """
+    resource_type = (finding.resource_type or "tenant").strip("/")
+    resource_id = finding.resource_id or "tenant"
+    raw = f"{resource_type}/{resource_id}"
+    safe = re.sub(r"[^A-Za-z0-9._/-]", "_", raw).strip("/")
+    return f"entra/{safe or 'tenant'}"

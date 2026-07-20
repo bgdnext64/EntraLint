@@ -89,6 +89,35 @@ def test_sarif_logical_location():
     assert loc["kind"] == "ConditionalAccessPolicy"
 
 
+def test_sarif_physical_location_present():
+    """GitHub Code Scanning requires a physicalLocation on every result."""
+    sarif = json.loads(format_sarif([_finding()]))
+    location = sarif["runs"][0]["results"][0]["locations"][0]
+    physical = location["physicalLocation"]
+    assert physical["artifactLocation"]["uri"] == "entra/ConditionalAccessPolicy/policy-abc"
+    assert physical["region"]["startLine"] == 1
+
+
+def test_sarif_physical_location_uri_sanitized():
+    """Resource ids with unsafe characters produce a filesystem-safe URI."""
+    finding = _finding(resource_type="User", resource_id="user@contoso.com")
+    sarif = json.loads(format_sarif([finding]))
+    uri = sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"][
+        "artifactLocation"
+    ]["uri"]
+    assert uri == "entra/User/user_contoso.com"
+
+
+def test_sarif_physical_location_defaults_to_tenant():
+    """Findings without resource info fall back to a tenant URI."""
+    finding = _finding(resource_type="", resource_id="")
+    sarif = json.loads(format_sarif([finding]))
+    uri = sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"][
+        "artifactLocation"
+    ]["uri"]
+    assert uri == "entra/tenant/tenant"
+
+
 def test_sarif_remediation_in_message():
     sarif = json.loads(format_sarif([_finding(remediation="Apply MFA")]))
     result = sarif["runs"][0]["results"][0]
