@@ -33,4 +33,7 @@ jobs:
         with:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           use-default-credential: "true"
-          fail-on: high
+          # Scheduled scan: do not hard-fail the workflow on findings. Results are
+          # published to GitHub Code Scanning (Security tab) as alerts instead.
+          # Use a stricter fail-on (e.g. high) in PR/push gating workflows.
+          fail-on: none
