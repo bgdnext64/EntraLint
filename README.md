@@ -12,7 +12,7 @@ Identity misconfigurations are one of the most common root causes of cloud breac
 
 Microsoft provides powerful built-in tools like Identity Secure Score and Entra Recommendations to track your tenant's security posture. EntraLint extends that coverage into your engineering workflow — adding CI/CD integration, deeper checks across applications and service principals, compliance framework mappings, and coverage for the newest Entra ID surfaces:
 
-- **Finds misconfigurations automatically** — 88 checks cover conditional access, MFA, privileged roles, app registrations, service principals, guest accounts, organization settings, cross-tenant access, and AI agent identities
+- **Finds misconfigurations automatically** — 90 checks cover conditional access, MFA, privileged roles, app registrations, service principals, guest accounts, organization settings, cross-tenant access, and AI agent identities
 - **Maps to compliance frameworks** — Every finding references CIS Microsoft 365 Foundations Benchmark v5, CISA SCuBA (BOD 25-01), and/or NIST 800-53 controls
 - **Fits into your workflow** — Run it locally during development, in CI/CD pipelines via SARIF output, or as a scheduled audit tool
 - **Requires read-only access** — EntraLint never modifies your tenant. It only reads configuration data through the Microsoft Graph API
@@ -24,11 +24,11 @@ It's a fair question. Microsoft ships excellent built-in tools — Identity Secu
 | Capability | Identity Secure Score | Entra Recommendations | Defender for Identity | EntraLint |
 |---|---|---|---|---|
 | **Where it runs** | Azure portal dashboard | Azure portal dashboard | Requires sensor on DCs / Entra Connect | CLI, CI/CD pipelines, GitHub Actions |
-| **Focus area** | ~20 high-level Entra ID settings | ~50 Entra ID + hybrid recommendations | On-premises AD, Kerberos, NTLM, certificates | Cloud-native Entra ID configuration (88 checks) |
+| **Focus area** | ~20 high-level Entra ID settings | ~50 Entra ID + hybrid recommendations | On-premises AD, Kerberos, NTLM, certificates | Cloud-native Entra ID configuration (90 checks) |
 | **App & SP credential & permission hygiene** | — | Expiring creds only | — | 18 checks: expired, long-lived, dual-type, high-privilege grants, orphaned owners, stale SPs |
 | **Conditional Access depth** | MFA, legacy auth, risk policies | Same as Secure Score | — | 14 checks: device code flow, session controls, exclusion sprawl, guest targeting, device compliance for admins |
 | **Privileged role analysis** | GA count, least privilege | Same | Lateral movement paths (on-prem) | 10 checks: PIM usage, break-glass accounts, guests in roles, SPs in roles, multi-role users, per-role caps |
-| **Agentic identity (Entra Agent ID)** | — | — | — | 18 dedicated checks (purpose-built for this emerging surface) |
+| **Agentic identity (Entra Agent ID)** | — | — | — | 20 dedicated checks (purpose-built for this emerging surface) |
 | **Cross-tenant & guest access** | — | — | — | 8 checks: inbound/outbound trust, MFA trust, guest invite settings, guest CA coverage |
 | **Output formats** | Portal only | Portal only | Portal / Sentinel | Table, JSON, SARIF, HTML |
 | **CI/CD gating** | No | No | No | `--fail-on critical` exits non-zero |
@@ -39,14 +39,14 @@ It's a fair question. Microsoft ships excellent built-in tools — Identity Secu
 
 ### What overlaps and what doesn't
 
-Microsoft's built-in tools and EntraLint are largely complementary — there's minimal redundancy. 13 of EntraLint's 88 checks overlap with what Secure Score and Entra Recommendations already cover, while the remaining **75 checks extend into areas** those tools weren't designed to address (CI/CD-oriented linting, deep app/SP credential analysis, cross-tenant trust, and agentic identity).
+Microsoft's built-in tools and EntraLint are largely complementary — there's minimal redundancy. 13 of EntraLint's 90 checks overlap with what Secure Score and Entra Recommendations already cover, while the remaining **77 checks extend into areas** those tools weren't designed to address (CI/CD-oriented linting, deep app/SP credential analysis, cross-tenant trust, and agentic identity).
 
 | Coverage source | Overlapping checks | What's covered |
 |---|---|---|
 | **Identity Secure Score** | 8 checks | MFA for all users, MFA for admins, block legacy auth, sign-in risk policy, user risk policy, restrict user consent, SSPR, Global Admin count |
 | **Entra Recommendations** | 5 additional | Expiring app credentials, unused app credentials, expiring SP credentials, stale user accounts, least-privilege roles |
 | **Defender for Identity** | 0 | Defender for Identity excels at on-premises AD security — EntraLint focuses on the cloud-native Entra ID configuration surface |
-| **Unique to EntraLint** | **75 checks** | Device code flow blocking, persistent browser sessions, named location review, CA exclusion sprawl, guest CA targeting, sign-in frequency for admins, FIDO2/passwordless, banned password lists, number matching, TAP lifetime, certificate-based auth, break-glass accounts, guests/SPs in privileged roles, per-role assignment caps, multi-role detection, app secret lifetime, non-admin app owners with high-priv permissions, excessive delegated permissions, multi-tenant app review, disabled SPs with credentials, third-party SP permissions, broad delegated grants, dual credential types, cross-tenant trust settings, guest invitation restrictions, app registration restrictions, all 18 agentic identity checks |
+| **Unique to EntraLint** | **77 checks** | Device code flow blocking, persistent browser sessions, named location review, CA exclusion sprawl, guest CA targeting, sign-in frequency for admins, FIDO2/passwordless, banned password lists, number matching, TAP lifetime, certificate-based auth, break-glass accounts, guests/SPs in privileged roles, per-role assignment caps, multi-role detection, app secret lifetime, non-admin app owners with high-priv permissions, excessive delegated permissions, multi-tenant app review, disabled SPs with credentials, third-party SP permissions, broad delegated grants, dual credential types, cross-tenant trust settings, guest invitation restrictions, app registration restrictions, all 20 agentic identity checks |
 
 ### When to use what
 
@@ -114,6 +114,7 @@ Running security checks...
  HIGH      entraid_agent_004  Agent 'data-summarizer' has overly broad scope (Mail.ReadWrite + Files.ReadWrite.All + Sites.ReadWrite.All)
  HIGH      entraid_agent_005  Agent 'rogue-poc' created by external app 14d82eec-204b-4c2f-b7e8-296a70dab67e (not on allowlist)
  HIGH      entraid_agent_006  Blueprint 'team-assistant-bp' has no owner or sponsor
+ HIGH      entraid_agent_019  Blueprints 'legacy-bot-bp' and 'corp-copilot-bp' share one certificate credential
  MEDIUM    entraid_agent_008  Blueprint 'legacy-bot-bp' uses client secrets instead of federated credentials
  MEDIUM    entraid_agent_010  Blueprint 'corp-copilot-bp' has no inheritable permission restrictions
  LOW       entraid_agent_012  Blueprint 'team-assistant-bp' has no description
@@ -128,7 +129,7 @@ Running security checks...
  PASS      entraid_auth_001   Security defaults disabled (CA in use)
 
 ╭─ Summary ───────────────────────────────────────────────────────────────╮
-│  Passed: 48  Failed: 17  Skipped: 5                                     │
+│  Passed: 48  Failed: 18  Skipped: 5                                     │
 ╰─────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -149,10 +150,13 @@ caught up yet. Here's why each line above matters:
 | **`entraid_agent_008` — Client secrets** | Agents using long-lived client secrets are stealable; federated credentials (workload identity federation) avoid the secret entirely. |
 | **`entraid_agent_010` — No inheritable restrictions** | The blueprint doesn't define a permission ceiling, so future agents created from it can request whatever they want. Best practice is to declare the maximum permission set at the blueprint level. |
 | **`entraid_agent_012` — No description** | Audit hygiene only, but matters at scale: when a tenant has dozens of agents, "what does this one do?" needs a fast answer. |
+| **`entraid_agent_019` — Shared certificate** | Two agents authenticating with the same certificate are indistinguishable — actions can't be attributed to a specific agent, and revoking the credential breaks every agent that relies on it. A single leaked certificate compromises all of them at once. |
+| **`entraid_agent_020` — Standing privileged role** | An agent holding a permanent Application Administrator (or similar) role has continuous high-impact access even when idle or compromised. Privileged access should be just-in-time and time-limited, scoped to the specific task. |
 
-EntraLint ships **all 18** Entra Agent ID checks today, covering
+EntraLint ships **all 20** Entra Agent ID checks today, covering
 permissions, blueprint inheritance, ownership, credentials, lifecycle,
-multi-tenant exposure, federated-credential hygiene, and origin/creator.
+multi-tenant exposure, federated-credential hygiene, origin/creator,
+shared-credential detection, and standing privileged roles.
 See [`uv run entralint list-checks --category AgentIdentity`](#cli-reference)
 for the full list.
 
@@ -272,12 +276,14 @@ Every check includes:
 
 ### Agentic Identity Checks
 
-EntraLint is among the first security scanners to provide dedicated checks for **Microsoft Entra Agent ID** — the identity platform that gives AI agents their own first-class identity type in Entra ID (Graph API v1.0 since March 2026). These 18 checks cover agent blueprints, blueprint principals, and agent identity instances, detecting issues like:
+EntraLint is among the first security scanners to provide dedicated checks for **Microsoft Entra Agent ID** — the identity platform that gives AI agents their own first-class identity type in Entra ID (Graph API v1.0 since March 2026). These 20 checks cover agent blueprints, blueprint principals, and agent identity instances, detecting issues like:
 
 - Agents holding dangerous or blocked permissions (e.g., `Files.ReadWrite.All`, `RoleManagement.ReadWrite.Directory`)
 - Blueprints using `allAllowedScopes` inheritance (allows agents to inherit any permission)
 - Multi-tenant agent blueprints exposed to external tenants
 - Federated identity credential (FIC) misconfigurations, such as wildcard subjects
+- Certificate credentials shared across multiple agent identities
+- Standing (permanent) privileged directory roles held by agents
 - Agent service principals granted broad delegated permissions
 - Orphaned agents and blueprints with no owner or sponsor
 - Disabled agents that still hold access, and stale agent identities with valid credentials

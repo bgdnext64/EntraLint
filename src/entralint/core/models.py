@@ -98,6 +98,11 @@ class KeyCredential(BaseModel):
     display_name: str | None = Field(default=None, alias="displayName")
     end_date_time: str | None = Field(default=None, alias="endDateTime")
     credential_type: str = Field(default="", alias="type")
+    # SHA-1 certificate thumbprint (base64). Shared value across principals
+    # indicates the same certificate is reused by multiple identities.
+    custom_key_identifier: str | None = Field(
+        default=None, alias="customKeyIdentifier"
+    )
 
     model_config = {"populate_by_name": True}
 
@@ -315,6 +320,9 @@ class AgentIdentity(BaseModel):
     tags: list[str] = Field(default_factory=list)
     owners: list[dict[str, Any]] = Field(default_factory=list)
     sponsors: list[dict[str, Any]] = Field(default_factory=list)
+    key_credentials: list[KeyCredential] = Field(
+        default_factory=list, alias="keyCredentials"
+    )
     app_role_assignments: list[AppRoleAssignment] = Field(
         default_factory=list, alias="appRoleAssignments"
     )

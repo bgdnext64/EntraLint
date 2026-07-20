@@ -1040,7 +1040,7 @@ EntraLint check `agent_003` specifically validates that no agent identity holds 
 
 ### Security Check Library (Agent Category)
 
-The agent category adds 18 checks targeting agent-specific risks. These checks operate on the typed `agentIdentity`, `agentIdentityBlueprint`, and `agentIdentityBlueprintPrincipal` resources returned from the GA endpoints.
+The agent category adds 20 checks targeting agent-specific risks. These checks operate on the typed `agentIdentity`, `agentIdentityBlueprint`, and `agentIdentityBlueprintPrincipal` resources returned from the GA endpoints.
 
 | Check ID | Severity | Title | What It Detects |
 |---|---|---|---|

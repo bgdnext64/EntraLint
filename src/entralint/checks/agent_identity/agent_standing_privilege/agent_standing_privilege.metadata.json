@@ -1,0 +1,22 @@
+{
+    "CheckID": "entraid_agent_020",
+    "CheckVersion": "1.0.0",
+    "CheckTitle": "Ensure agent identities do not hold standing privileged roles",
+    "ServiceName": "AgentIdentity",
+    "Severity": "HIGH",
+    "ResourceType": "AgentIdentity",
+    "Description": "Detects agent identities that hold a permanent (standing) assignment to a high-privilege directory role instead of a time-limited, just-in-time entitlement.",
+    "Risk": "A standing privileged role gives an agent continuous high-impact access that persists even when the agent is idle or compromised. Temporary access granted without an expiry becomes permanent by default, widening the blast radius of a stolen credential and violating least-privilege for AI agents.",
+    "Remediation": {
+        "Recommendation": "Remove permanent privileged role assignments from agent identities. Grant privileged access as time-limited, just-in-time entitlements scoped to the specific task (for example, PIM-eligible assignments with activation limits). Prefer narrowly scoped, resource-specific roles over standing directory-wide roles.",
+        "Url": "https://learn.microsoft.com/en-us/security/zero-trust/sfi/least-privilege-for-ai-agents"
+    },
+    "Frameworks": [
+        {"framework": "NIST_800-53", "controls": ["AC-2", "AC-6"], "verified": false, "source": "AI-generated mapping"}
+    ],
+    "GraphAPIEndpoints": ["/agentIdentities", "/roleManagement/directory/roleAssignments"],
+    "RequiredPermissions": ["AgentIdentity.Read.All", "RoleManagement.Read.Directory"],
+    "RequiredLicense": null,
+    "DependsOn": [],
+    "SourceNotes": "Detection reads active directory role assignments (roleManagement/directory/roleAssignments) whose principal is an agent identity, which is available on all Entra tiers. Converting to just-in-time eligible assignments (the recommended remediation) requires Microsoft Entra ID P2 / PIM. Grounded in Microsoft's 'Least privilege for AI agents' guidance (2026): temporary access without an expiry becomes permanent."
+}

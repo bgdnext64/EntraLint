@@ -570,6 +570,9 @@ function Seed-AgentIdentities {
         @{ slug = 'AgentBP-MultiTenant'; body = @{ displayName = (New-DemoName 'AgentBP-MultiTenant'); description = 'Multi-tenant agent blueprint'; signInAudience = 'AzureADMultipleOrgs'; 'sponsors@odata.bind' = @($sponsorUri) } },
         # entraid_agent_015 (HIGH): a misconfigured federated credential is added below.
         @{ slug = 'AgentBP-BadFIC';      body = @{ displayName = (New-DemoName 'AgentBP-BadFIC');      description = 'Blueprint with a misconfigured federated credential'; 'sponsors@odata.bind' = @($sponsorUri) } },
+        # entraid_agent_019 (HIGH): two blueprints will share one certificate credential (added below).
+        @{ slug = 'AgentBP-SharedCertA'; body = @{ displayName = (New-DemoName 'AgentBP-SharedCertA'); description = 'Shares a certificate with SharedCertB'; 'sponsors@odata.bind' = @($sponsorUri) } },
+        @{ slug = 'AgentBP-SharedCertB'; body = @{ displayName = (New-DemoName 'AgentBP-SharedCertB'); description = 'Shares a certificate with SharedCertA'; 'sponsors@odata.bind' = @($sponsorUri) } },
         # entraid_agent_018 (LOW): blueprint intentionally created without any sponsor.
         @{ slug = 'AgentBP-NoSponsor';   body = @{ displayName = (New-DemoName 'AgentBP-NoSponsor');   description = 'Blueprint with no accountable sponsor' } }
     )
@@ -614,6 +617,29 @@ function Seed-AgentIdentities {
             } else {
                 Write-Warning "  [agent_015] Tenant rejected the federated credential; check will PASS."
             }
+        }
+    }
+
+    # entraid_agent_019 (HIGH): register the SAME certificate on two blueprints
+    # so the credential (identical customKeyIdentifier thumbprint) is shared,
+    # which erases per-agent accountability.
+    if ($created['AgentBP-SharedCertA'] -and $created['AgentBP-SharedCertB']) {
+        $sharedCert = New-DemoSelfSignedCert -Subject "CN=$(New-DemoName 'AgentSharedCert')"
+        if ($sharedCert) {
+            $sharedKeyCred = @(@{ type = 'AsymmetricX509Cert'; usage = 'Verify'; displayName = 'shared-agent-cert'; key = $sharedCert })
+            $sharedCount = 0
+            foreach ($slug in @('AgentBP-SharedCertA', 'AgentBP-SharedCertB')) {
+                if ($PSCmdlet.ShouldProcess($created[$slug].id, 'Add shared certificate credential')) {
+                    Invoke-MgAgent -Method PATCH -Uri "$script:GraphBase/applications/$($created[$slug].id)" `
+                        -Body @{ keyCredentials = $sharedKeyCred } -IgnoreError | Out-Null
+                    $sharedCount++
+                }
+            }
+            if ($sharedCount -eq 2) {
+                Write-Host "  [agent_019] Registered one shared certificate on two blueprints" -ForegroundColor Green
+            }
+        } else {
+            Write-Warning "  [agent_019] Could not generate certificate; check will PASS."
         }
     }
 
@@ -704,6 +730,14 @@ function Seed-AgentIdentities {
             }
         }
     }
+
+    # NOTE: entraid_agent_020 (standing privileged role) cannot be seeded in a
+    # live tenant. The platform blocks assigning ANY privileged directory role
+    # to an agentic entity ("the specified role is not allowed for assignment to
+    # agentic entities") - verified against Global Admin, Privileged Role Admin,
+    # Security Admin, Application Admin, Cloud App Admin, and User Admin. The
+    # check is defense-in-depth (confirms that enforcement holds and catches any
+    # legacy / edge-case grant); exercise it via the unit tests / a JSON fixture.
 
     # NOTE: entraid_agent_016 (orphaned blueprint) cannot be seeded reliably in
     # a live tenant - it requires an agent that references a blueprint id which
