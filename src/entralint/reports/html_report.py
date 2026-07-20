@@ -537,7 +537,7 @@ _TEMPLATE = """\
 </table>
 
 <h2>Agentic Identity Checks</h2>
-<p>EntraLint is the first security scanner to provide dedicated checks for <strong>Microsoft Entra Agent ID</strong> &mdash; the GA platform (March 2026) that gives AI agents their own first-class identity type. These 18 checks cover:</p>
+<p>EntraLint is the first security scanner to provide dedicated checks for <strong>Microsoft Entra Agent ID</strong> &mdash; the GA platform (March 2026) that gives AI agents their own first-class identity type. These 20 checks cover:</p>
 <ul>
   <li>Agents holding dangerous or blocked permissions (e.g., <code>Files.ReadWrite.All</code>, <code>RoleManagement.ReadWrite.Directory</code>)</li>
   <li>Blueprints using <code>allAllowedScopes</code> inheritance (agents inherit any permission)</li>
@@ -548,6 +548,8 @@ _TEMPLATE = """\
   <li>Disabled agents that still hold access, and stale agent identities with valid credentials</li>
   <li>External (third-party) agent blueprints operating in your tenant</li>
   <li>Agents using client secrets instead of federated credentials</li>
+  <li>Certificate credentials shared across multiple agent identities</li>
+  <li>Standing (permanent) privileged directory roles held by agents</li>
 </ul>
 
 <h2>Understanding Skipped Checks</h2>
